@@ -1,0 +1,135 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System users (chef or kid)",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "role": { "type": "string", "enum": ["chef", "kid"] },
+        "name": { "type": "string" },
+        "avatar": { "type": "string" },
+        "oneSignalIds": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "readNews": { "type": "array", "items": { "type": "string" } },
+        "favorites": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["username", "password", "role", "name"]
+    },
+    "Recipe": {
+      "title": "Recipe",
+      "description": "Meal recipes",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "ingredients": { "type": "array", "items": { "type": "string" } },
+        "steps": { "type": "array", "items": { "type": "string" } },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "imageUrl": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "isPublished": { "type": "boolean" },
+        "avgRating": { "type": "number" },
+        "totalRatings": { "type": "number" },
+        "favoriteCount": { "type": "number" }
+      }
+    },
+    "WeeklyMenu": {
+      "title": "Weekly Menu",
+      "description": "Menu for a specific week",
+      "type": "object",
+      "properties": {
+        "weekStart": { "type": "string", "format": "date" },
+        "slots": {
+          "type": "object",
+          "properties": {
+            "mon": { "type": "array", "items": { "type": "string" } },
+            "tue": { "type": "array", "items": { "type": "string" } },
+            "wed": { "type": "array", "items": { "type": "string" } },
+            "thu": { "type": "array", "items": { "type": "string" } },
+            "fri": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Kid's meal orders for the week",
+      "type": "object",
+      "properties": {
+        "kidId": { "type": "string" },
+        "weekId": { "type": "string" },
+        "meals": {
+          "type": "object",
+          "properties": {
+            "mon": { "type": "array", "items": { "type": "string" } },
+            "tue": { "type": "array", "items": { "type": "string" } },
+            "wed": { "type": "array", "items": { "type": "string" } },
+            "thu": { "type": "array", "items": { "type": "string" } },
+            "fri": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "status": { "type": "string", "enum": ["pending", "preparing", "ready", "done"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Meal reviews and comments",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string" },
+        "recipeId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorRole": { "type": "string", "enum": ["chef", "kid"] },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "parentId": { "type": "string" }
+      }
+    },
+    "News": {
+      "title": "News",
+      "description": "News items",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isPinned": { "type": "boolean" }
+      }
+    },
+    "KitchenConfig": {
+      "title": "Kitchen Config",
+      "description": "Information about the kitchen settings",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "directions": { "type": "string" },
+        "mapsShareLink": { "type": "string" },
+        "openTime": { "type": "string" },
+        "closeTime": { "type": "string" },
+        "servingDays": { "type": "array", "items": { "type": "string" } },
+        "readyMessage": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "users": { "schema": "User", "description": "System users" },
+    "recipes": { "schema": "Recipe", "description": "Food recipes" },
+    "weeklyMenu": { "schema": "WeeklyMenu", "description": "Menu plans" },
+    "orders": { "schema": "Order", "description": "Kid orders" },
+    "reviews": { "schema": "Review", "description": "User reviews" },
+    "news": { "schema": "News", "description": "Announcements" },
+    "config/main": { "schema": "KitchenConfig", "description": "Kitchen details" }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "Món ngon cho bé",
+  "short_name": "Món ngon",
+  "description": "Ứng dụng đặt món ăn cho bé",
+  "start_url": "/kids/home",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f97316",
+  "icons": [
+    {
+      "src": "./app.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./app.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Helpers ---
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.]+$'); 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // --- User Validation ---
+    function isValidUser(data) {
+      return data.keys().hasAll(['username', 'password', 'role', 'name', 'createdAt'])
+        && data.username is string && data.username.size() > 0 && data.username.size() <= 50
+        && data.password is string && data.password.size() >= 6
+        && data.role in ['chef', 'kid']
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && data.createdAt is timestamp
+        && (!data.keys().hasAny(['avatar']) || (data.avatar is string && data.avatar.size() < 2000))
+        && (!data.keys().hasAny(['favorites']) || (data.favorites is list && data.favorites.size() <= 200));
+    }
+
+    match /users/{userId} {
+      allow read: if true; 
+      allow create: if isValidUser(incoming()) && isValidId(userId);
+      allow update: if isValidUser(incoming()) && isValidId(userId) && (
+        incoming().username == existing().username &&
+        incoming().role == existing().role &&
+        incoming().createdAt == existing().createdAt
+      );
+    }
+
+    // --- Recipe Validation ---
+    function isValidRecipe(data) {
+      return data.keys().hasAll(['title', 'description', 'ingredients', 'steps', 'createdBy', 'createdAt', 'isPublished'])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 2000
+        && data.ingredients is list && data.ingredients.size() <= 50
+        && data.steps is list && data.steps.size() <= 50
+        && data.createdBy is string && isValidId(data.createdBy)
+        && data.isPublished is bool
+        && (data.get('avgRating', 0) is number)
+        && (data.get('totalRatings', 0) is number)
+        && (data.get('favoriteCount', 0) is number);
+    }
+
+    match /recipes/{recipeId} {
+      allow read: if true;
+      allow create, update: if isValidRecipe(incoming()) && isValidId(recipeId);
+      allow delete: if true;
+    }
+
+    // --- WeeklyMenu Validation ---
+    function isValidMenu(data) {
+      return data.keys().hasAll(['weekStart', 'slots'])
+        && data.weekStart is string && data.weekStart.size() <= 20
+        && data.slots is map && data.slots.keys().size() <= 10;
+    }
+
+    match /weeklyMenu/{menuId} {
+      allow read: if true;
+      allow create, update: if isValidMenu(incoming()) && isValidId(menuId);
+      allow delete: if true;
+    }
+
+    // --- Order Validation ---
+    function isValidOrder(data) {
+      return data.keys().hasAll(['kidId', 'weekId', 'day', 'recipeId', 'status', 'createdAt', 'updatedAt'])
+        && data.kidId is string && isValidId(data.kidId)
+        && data.weekId is string && data.weekId.size() <= 20
+        && data.day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+        && data.recipeId is string && isValidId(data.recipeId)
+        && data.status in ['pending', 'preparing', 'ready', 'on_the_way', 'arrived', 'done', 'cancelled']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /orders/{orderId} {
+      allow read: if true; 
+      allow create: if isValidOrder(incoming());
+      allow update: if isValidOrder(incoming()) && (
+        // Only allow status updates or recipe updates if pending or cancelled
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+        ((existing().status == 'pending' || existing().status == 'cancelled') && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['recipeId', 'status', 'updatedAt'])))
+      );
+      allow delete: if existing().status == 'pending';
+    }
+
+    // --- News Validation ---
+    function isValidNews(data) {
+      return data.keys().hasAll(['title', 'content', 'createdBy', 'createdAt', 'isPinned'])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 500
+        && data.content is string && data.content.size() <= 5000
+        && data.createdBy is string && isValidId(data.createdBy)
+        && data.createdAt is timestamp
+        && data.isPinned is bool;
+    }
+
+    match /news/{newsId} {
+      allow read: if true;
+      allow create, update: if isValidNews(incoming());
+      allow delete: if true;
+    }
+
+    // --- Review Validation ---
+    function isValidReview(data) {
+      return data.keys().hasAll(['recipeId', 'authorId', 'authorName', 'authorRole', 'comment', 'createdAt'])
+        && data.recipeId is string && isValidId(data.recipeId)
+        && data.authorId is string && isValidId(data.authorId)
+        && data.authorName is string && data.authorName.size() <= 100
+        && data.authorRole in ['chef', 'kid']
+        && data.comment is string && data.comment.size() <= 2000
+        && data.createdAt is timestamp
+        && (data.get('rating', 0) is number)
+        && (data.get('parentId', '') is string)
+        && (data.get('orderId', '') is string)
+        && (data.get('imageUrls', []).size() <= 3);
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isValidReview(incoming());
+      allow update: if false; 
+      allow delete: if false;
+    }
+
+    // --- Kitchen Config Validation ---
+    function isValidKitchenConfig(data) {
+      return data.keys().hasAll(['name', 'directions', 'mapsShareLink', 'openTime', 'closeTime', 'servingDays', 'readyMessage'])
+        && data.name is string && data.name.size() > 0
+        && data.directions is string
+        && data.mapsShareLink is string
+        && data.openTime is string
+        && data.closeTime is string
+        && data.servingDays is list
+        && data.readyMessage is string;
+    }
+
+    match /config/main {
+      allow read: if true;
+      allow create, update: if isValidKitchenConfig(incoming());
+      allow delete: if true;
+    }
+  }
+}
