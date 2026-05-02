@@ -152,5 +152,34 @@ service cloud.firestore {
       allow create, update: if isValidKitchenConfig(incoming());
       allow delete: if true;
     }
+
+    // --- Achievement Validation ---
+    function isValidAchievement(data, isCreate) {
+      return (isCreate ? data.keys().hasAll(['title', 'isActive', 'logic', 'conditions']) : true)
+        && (!data.keys().hasAny(['title']) || (data.title is string && data.title.size() > 0 && data.title.size() <= 200))
+        && (!data.keys().hasAny(['isActive']) || (data.isActive is bool))
+        && (!data.keys().hasAny(['logic']) || (data.logic in ['AND', 'OR']))
+        && (!data.keys().hasAny(['conditions']) || (data.conditions is list && data.conditions.size() > 0 && data.conditions.size() <= 4))
+        && (!data.keys().hasAny(['description']) || data.description is string)
+        && (!data.keys().hasAny(['emoji']) || data.emoji is string)
+        && (!data.keys().hasAny(['order']) || data.order is number)
+        && (!data.keys().hasAny(['createdAt']) || data.createdAt is timestamp)
+        && (!data.keys().hasAny(['updatedAt']) || data.updatedAt is timestamp);
+    }
+
+    match /achievements/{achievementId} {
+      allow read: if true;
+      allow create: if isValidAchievement(incoming(), true);
+      allow update: if isValidAchievement(incoming(), false);
+      allow delete: if true;
+    }
+
+    match /users/{userId}/unlockedAchievements/{achievementId} {
+      allow read: if true;
+      allow create, update: if isValidId(userId) && isValidId(achievementId)
+        && incoming().keys().hasAll(['unlockedAt'])
+        && incoming().unlockedAt is timestamp;
+      allow delete: if false;
+    }
   }
 }

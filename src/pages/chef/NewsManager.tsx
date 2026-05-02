@@ -32,7 +32,8 @@ import {
   Save, 
   Loader2,
   AlertTriangle,
-  Upload
+  Upload,
+  Megaphone
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ReactQuill from 'react-quill-new';
@@ -145,10 +146,14 @@ export default function NewsManager() {
         try {
           const kidIds = await getAllKidOneSignalIds();
           if (kidIds.length > 0) {
+            const pushBody = editing.title!.length > 100 
+              ? editing.title!.substring(0, 97) + '...' 
+              : editing.title!;
+
             await sendPushToUser(
               kidIds,
-              'Tin mới từ Đầu bếp 📣',
-              editing.title!,
+              'Tin mới từ Đầu bếp',
+              pushBody,
               '/kids/home'
             );
           }
@@ -237,8 +242,9 @@ export default function NewsManager() {
                   
                   {/* Badges */}
                   {item.isPinned && (
-                    <div className="absolute top-[10px] left-[10px] bg-orange-500 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 border border-orange-400 z-10">
-                      <span>📌</span> Ghim
+                    <div className="absolute top-[10px] left-[10px] bg-orange-500 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 border border-orange-400 z-10">
+                      <Pin size={12} fill="white" className="-rotate-45" />
+                      Ghim
                     </div>
                   )}
                   {!item.isPublished && (
@@ -449,7 +455,7 @@ export default function NewsManager() {
         isOpen={!!deleteConfirm}
         onClose={() => setDeleteConfirm(null)}
         onConfirm={() => deleteConfirm && handleDelete(deleteConfirm)}
-        icon="🗑️"
+        icon={<Trash2 size={24} className="text-destructive" />}
         title="Xác nhận xóa?"
         message="Bản tin này sẽ bị xóa khỏi hệ thống cho tất cả người dùng."
         confirmText="Xóa bài"

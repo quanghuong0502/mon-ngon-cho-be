@@ -49,7 +49,7 @@ const DEFAULT_CONFIG: KitchenConfig = {
   openTime: '11:00',
   closeTime: '13:00',
   servingDays: ['mon', 'tue', 'wed', 'thu', 'fri'],
-  readyMessage: 'Món ăn của bé đã sẵn sàng! Qua bếp lấy nhé 🍱'
+  readyMessage: 'Món ăn của bé đã sẵn sàng! Qua bếp lấy nhé'
 };
 
 export default function ChefSettings() {

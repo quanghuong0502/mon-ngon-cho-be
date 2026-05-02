@@ -19,6 +19,7 @@ import {
 import { db } from '../../lib/firebase';
 import { News, Recipe, WeeklyMenu, User } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import Avatar from '../../components/Avatar';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ChevronRight, 
@@ -32,7 +33,16 @@ import {
   Clock,
   MapPin,
   Navigation,
-  Heart
+  Heart,
+  Bell,
+  Flame,
+  Star as StarIcon,
+  Target,
+  Trophy,
+  History,
+  Info,
+  Sparkles,
+  Inbox
 } from 'lucide-react';
 import { format, startOfWeek } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -394,15 +404,16 @@ export default function KidsHome() {
       const kidName = greetingName;
       const recipeDoc = await getDoc(doc(db, 'recipes', todayOrder.recipeId));
       const recipeName = recipeDoc.data()?.title || 'món ăn';
+      const displayRecipeName = recipeName.length > 30 ? recipeName.substring(0, 27) + '...' : recipeName;
 
       const messages: Record<string, { title: string; body: string }> = {
         on_the_way: {
-          title: `Bé ${kidName} đang trên đường! 🚶`,
-          body: `Bé đang đến lấy món ${recipeName}. Chuẩn bị nhé!`
+          title: `Bé ${kidName} đang trên đường!`,
+          body: `Bé đang đến lấy món ${displayRecipeName}. Chuẩn bị nhé!`
         },
         arrived: {
-          title: `Bé ${kidName} đã tới bếp! 📍🔔`,
-          body: `Bé đang chờ nhận món ${recipeName}. Giao món thôi!`
+          title: `Bé ${kidName} đã tới bếp!`,
+          body: `Bé đang chờ nhận món ${displayRecipeName}. Giao món thôi!`
         }
       };
 
@@ -418,6 +429,7 @@ export default function KidsHome() {
       console.error('Error updating order status:', err);
     }
   };
+  console.log(todayOrder)
 
   useEffect(() => {
     // Check for unread news that deserve a popup
@@ -478,11 +490,14 @@ export default function KidsHome() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-secondary border border-border rounded-2xl p-4 flex items-center gap-4 mb-4 mt-6 shadow-sm relative overflow-hidden"
         >
-          <span className="text-2xl">🔔</span>
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+            <Bell size={20} />
+          </div>
           <div className="flex-1">
             <div className="text-sm font-bold text-foreground">Bật thông báo nhé!</div>
-            <div className="text-[11px] text-muted-foreground">
-              Bé sẽ biết ngay khi món ăn sẵn sàng 🍱
+            <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+              <ChefHat size={12} className="text-primary/60" />
+              Bé sẽ biết ngay khi món ăn sẵn sàng
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -505,10 +520,29 @@ export default function KidsHome() {
       {/* Hero Greeting Section */}
       <div className="page-header pt-2 mb-4 shrink-0">
         <section className="bg-gradient-to-br from-secondary/50 to-secondary p-8 rounded-[40px] border border-border">
-          <div className="flex flex-col gap-1">
-            <p className="text-primary font-black uppercase tracking-[0.2em] text-[10px] mb-2">{todayFormatted}</p>
-            <h1 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">Xin chào, bé <span className="text-primary">{greetingName}!</span> 🍱</h1>
-            <p className="text-muted-foreground font-medium text-base">Hôm nay bé muốn ăn gì nào?</p>
+          <div className="flex items-center justify-between gap-6">
+            <div className="flex flex-col gap-1">
+              <p className="text-primary font-black uppercase tracking-[0.2em] text-[10px] mb-2">{todayFormatted}</p>
+              <h1 className="text-2xl md:text-3xl font-black text-foreground tracking-tight flex items-center gap-6">
+                <div className="flex flex-col">
+                Xin chào, 
+                <div>bé <span className="text-primary">{greetingName}!</span></div>
+                </div>
+                <Sparkles className="text-primary animate-pulse" size={24} />
+              </h1>
+              <p className="text-muted-foreground font-medium text-sm sm:text-base">Hôm nay bé muốn ăn gì nào?</p>
+            </div>
+            <div 
+              className="shrink-0 cursor-pointer hover:scale-105 transition-transform"
+              onClick={() => navigate('/kids/profile')}
+            >
+              <Avatar 
+                src={user?.avatar} 
+                name={greetingName} 
+                size={80} 
+                className="rounded-3xl border-4 border-card shadow-lg"
+              />
+            </div>
           </div>
         </section>
       </div>
@@ -520,17 +554,17 @@ export default function KidsHome() {
             animate={{ opacity: 1, scale: 1 }}
             className="flex items-center gap-2 bg-accent/40 border border-border rounded-xl px-4 py-3 w-full shadow-sm justify-start"
           >
-            <span className="text-[18px] leading-none">🔥</span>
+            <Flame className="text-orange-500 fill-orange-500" size={18} />
             <span className="text-[20px] font-bold text-primary leading-none">{streak}</span>
             <span className="text-[13px] text-muted-foreground font-medium whitespace-nowrap">ngày liên tiếp</span>
             <span className="text-muted-foreground/30 text-[16px] mx-1">·</span>
-            <span className="text-[13px] text-primary font-medium whitespace-nowrap">
-              {streak === 1 && "Ngày đầu tiên! 💪"}
-              {streak === 2 && "2 ngày rồi! 🌟"}
-              {(streak === 3 || streak === 4) && "Phong độ tốt! 🎯"}
-              {streak === 5 && "Cả tuần! 🏆"}
-              {(streak >= 6 && streak <= 9) && "Chăm lắm! 🔥"}
-              {streak >= 10 && "Siêu sao! 🌈"}
+            <span className="text-[13px] text-primary font-medium whitespace-nowrap flex items-center gap-1.5">
+              {streak === 1 && <><Sparkles size={14} /> Ngày đầu tiên!</>}
+              {streak === 2 && <><StarIcon size={14} className="fill-current" /> 2 ngày rồi!</>}
+              {(streak === 3 || streak === 4) && <><Target size={14} /> Phong độ tốt!</>}
+              {streak === 5 && <><Trophy size={14} /> Cả tuần!</>}
+              {(streak >= 6 && streak <= 9) && <><Flame size={14} className="fill-current" /> Chăm lắm!</>}
+              {streak >= 10 && <><History size={14} /> Siêu sao!</>}
             </span>
           </motion.div>
         </div>
@@ -642,13 +676,14 @@ export default function KidsHome() {
                       <button
                         disabled={!isKitchenOpen}
                         onClick={() => updateOrderStatus('on_the_way')}
-                        className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all ${
+                        className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
                           isKitchenOpen 
                             ? 'bg-card text-primary hover:scale-[1.02] active:scale-95' 
                             : 'bg-primary-foreground/20 text-primary-foreground/50 cursor-not-allowed border border-white/10'
                         }`}
                       >
-                        Mình đang đến lấy! 🚶
+                        <Navigation size={18} className="rotate-45" />
+                        Mình đang đến lấy!
                       </button>
                       {!isKitchenOpen && (
                         <p className="text-[10px] text-center font-bold text-primary-foreground/70 bg-white/10 py-2 rounded-xl border border-white/5">
@@ -663,13 +698,14 @@ export default function KidsHome() {
                       <button
                         disabled={!isKitchenOpen}
                         onClick={() => updateOrderStatus('arrived')}
-                        className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all ${
+                        className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
                           isKitchenOpen 
                             ? 'bg-card text-primary hover:scale-[1.02] active:scale-95' 
                             : 'bg-primary-foreground/20 text-primary-foreground/50 cursor-not-allowed border border-white/10'
                         }`}
                       >
-                        Mình đã tới bếp! 📍
+                        <MapPin size={18} />
+                        Mình đã tới bếp!
                       </button>
                       {!isKitchenOpen && (
                         <p className="text-[10px] text-center font-bold text-primary-foreground/70 bg-white/10 py-2 rounded-xl border border-white/5">
@@ -721,10 +757,10 @@ export default function KidsHome() {
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="mb-8 p-4 bg-secondary border border-dashed border-border rounded-2xl text-center"
+                className="mb-8 p-4 bg-secondary border border-dashed border-border rounded-2xl text-center flex items-center justify-center gap-2"
               >
-                <p className="text-[13px] text-primary font-medium italic">
-                  Đặt món hôm nay để bắt đầu streak mới nhé! 🍱
+                <p className="text-xs text-primary font-medium italic">
+                  Đặt món hôm nay để bắt đầu streak mới nhé!
                 </p>
               </motion.div>
             )}
@@ -773,17 +809,17 @@ export default function KidsHome() {
 
           {/* News Section */}
           <section>
-            <div className="flex items-center justify-between mb-8 px-1">
+            <div className="flex items-center justify-between mb-8 px-1 gap-8">
               <div className="space-y-[2px]">
                 <h2 className="text-[20px] font-semibold text-foreground flex items-center gap-3">
                   <Megaphone className="text-primary animate-swing" size={20} />
-                  Tin từ Đầu bếp 📣
+                  Tin từ Đầu bếp
                 </h2>
                 <p className="text-[13px] font-normal text-muted-foreground">Thông báo và hoạt động mới nhất tại bếp trường</p>
               </div>
               {news.length > 3 && (
                 <button 
-                  className="text-primary font-black text-xs uppercase tracking-widest flex items-center gap-1 hover:underline"
+                  className="text-primary font-black text-xs tracking-widest flex items-center gap-1 hover:underline shrink-0"
                   onClick={() => {/* To news list page if ever exists */}}
                 >
                   Xem thêm <ChevronRight size={16} />
@@ -793,10 +829,10 @@ export default function KidsHome() {
 
             {news.length === 0 ? (
               <div className="bg-secondary border-2 border-dashed border-border rounded-[40px] py-16 flex flex-col items-center justify-center text-center">
-                <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center text-3xl mb-4">
-                  📭
+                <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center text-muted-foreground/30 mb-4">
+                  <Inbox size={40} />
                 </div>
-                <p className="text-muted-foreground font-bold">Chưa có tin mới từ Đầu bếp</p>
+                <p className="text-muted-foreground font-bold text-sm">Chưa có tin mới từ Đầu bếp</p>
               </div>
             ) : (
               <div className="flex gap-6 overflow-x-auto pb-6 scrollbar-hide -mx-2 px-2">
@@ -814,8 +850,9 @@ export default function KidsHome() {
                         <div className="w-full h-full flex items-center justify-center text-muted-foreground"><Megaphone size={40} /></div>
                       )}
                       {item.isPinned && (
-                        <div className="absolute top-3 left-3 bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 border border-primary/50">
-                          <span>📌</span> Ghim
+                        <div className="absolute top-3 left-3 bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 border border-primary/50">
+                          <Pin size={12} fill="currentColor" className="-rotate-45" />
+                          Ghim
                         </div>
                       )}
                     </div>
@@ -886,7 +923,7 @@ export default function KidsHome() {
                       </div>
                       {meal.favoriteCount !== undefined && (
                         <div className="flex items-center gap-1">
-                          <span className="text-[10px]">❤️</span>
+                          <Heart size={10} className="fill-destructive text-destructive" />
                           <span className="text-[10px] font-bold text-muted-foreground">{meal.favoriteCount}</span>
                         </div>
                       )}

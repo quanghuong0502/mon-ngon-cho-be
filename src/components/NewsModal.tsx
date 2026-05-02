@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { Calendar, ChefHat } from 'lucide-react';
+import { Calendar, ChefHat, Flame } from 'lucide-react';
 import { News } from '../types';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -36,7 +36,10 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
                   {format(news.createdAt.toDate(), 'dd MMMM yyyy', { locale: vi })}
                 </div>
                 {news.isPinned && (
-                  <span className="px-2 py-0.5 rounded bg-destructive/10 text-destructive font-bold">Tin mới 🔥</span>
+                  <span className="px-3 py-1 rounded-full bg-destructive/10 text-destructive flex items-center gap-1.5 font-black uppercase tracking-widest text-[9px]">
+                    <Flame size={12} className="fill-destructive" />
+                    Tin mới
+                  </span>
                 )}
               </div>
               <h2 className="text-2xl md:text-3xl font-black text-foreground leading-tight">{news.title}</h2>

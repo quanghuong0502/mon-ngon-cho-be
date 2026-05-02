@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Recipe, Review } from '../types';
 import HeartButton from './HeartButton';
+import Avatar from './Avatar';
 import { db } from '../lib/firebase';
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
 import { 
@@ -56,8 +57,34 @@ export default function RecipeModal({ recipe, onClose }: RecipeModalProps) {
         orderBy('createdAt', 'desc')
       );
       const snap = await getDocs(q);
-      const loadedReviews = snap.docs.map(d => ({ id: d.id, ...d.data() } as Review));
-      setReviews(loadedReviews);
+      const reviewsData = snap.docs.map(d => ({ id: d.id, ...d.data() } as Review));
+      
+      // Enrich reviews with missing avatars
+      const authorIds = Array.from(new Set(reviewsData.filter(r => !r.authorAvatar).map(r => r.authorId)));
+      
+      if (authorIds.length > 0) {
+        const { getDoc, doc } = await import('firebase/firestore');
+        const profiles: Record<string, string | null> = {};
+        
+        await Promise.all(authorIds.map(async (id) => {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', id));
+            if (userDoc.exists()) {
+              profiles[id] = userDoc.data().avatar || null;
+            }
+          } catch (e) {
+            console.error('Error fetching user profile:', e);
+          }
+        }));
+        
+        const enrichedReviews = reviewsData.map(r => ({
+          ...r,
+          authorAvatar: r.authorAvatar || profiles[r.authorId] || null
+        }));
+        setReviews(enrichedReviews);
+      } else {
+        setReviews(reviewsData);
+      }
     } catch (err) {
       console.error('Error fetching reviews:', err);
     } finally {
@@ -70,7 +97,7 @@ export default function RecipeModal({ recipe, onClose }: RecipeModalProps) {
   return (
     <BottomSheet isOpen={!!recipe} onClose={onClose}>
       {recipe && (
-        <div className="flex flex-col md:flex-row pb-20 md:pb-0">
+        <div className="flex flex-col md:flex-row">
           {/* Main Content (Left on Desktop) */}
           <div className="flex-1">
             <div className="relative h-64 md:h-96 w-full bg-secondary shrink-0">
@@ -99,7 +126,7 @@ export default function RecipeModal({ recipe, onClose }: RecipeModalProps) {
                     <div className="flex items-center gap-1 text-primary">
                       <Star size={14} fill="currentColor" />
                       <span className="text-xs font-bold">{recipe.avgRating?.toFixed(1) || '0.0'}</span>
-                      <span className="text-muted-foreground font-normal">({recipe.totalRatings || 0})</span>
+                      <span className="text-muted-foreground text-xs font-normal">({recipe.totalRatings || 0})</span>
                     </div>
                     {recipe.favoriteCount !== undefined && (
                       <div className="flex items-center gap-1 text-destructive text-xs font-bold bg-destructive/10 px-2 py-1 rounded-full">
@@ -178,9 +205,11 @@ export default function RecipeModal({ recipe, onClose }: RecipeModalProps) {
                     <div className="bg-card p-4 rounded-2xl shadow-sm border border-border">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2 text-left">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-primary-foreground bg-primary/80`}>
-                            {review.authorName.charAt(0).toUpperCase()}
-                          </div>
+                          <Avatar 
+                            src={review.authorAvatar} 
+                            name={review.authorName} 
+                            size={32} 
+                          />
                           <div>
                             <p className="text-xs font-bold text-foreground">{review.authorName}</p>
                             <p className="text-[10px] text-muted-foreground">{format(review.createdAt.toDate(), 'HH:mm dd/MM/yy', { locale: vi })}</p>

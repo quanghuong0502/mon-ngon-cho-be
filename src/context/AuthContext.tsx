@@ -25,13 +25,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    // Keep it here in case getSession() logic needs to run on mount
-    // or if we add more complex validation later.
-    const session = getSession();
-    if (session) {
-      setUser(session);
-    }
-    setLoading(false);
+    const syncUser = async () => {
+      const session = getSession();
+      if (session?.userId) {
+        try {
+          const { doc, getDoc } = await import('firebase/firestore');
+          const { db } = await import('../lib/firebase');
+          const userDoc = await getDoc(doc(db, 'users', session.userId));
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            const updatedSession = {
+              ...session,
+              name: userData.name || session.name,
+              avatar: userData.avatar || null,
+            };
+            setUser(updatedSession);
+            saveSession(updatedSession);
+          } else {
+            setUser(session);
+          }
+        } catch (err) {
+          console.error('Error syncing user data:', err);
+          setUser(session);
+        }
+      }
+      setLoading(false);
+    };
+
+    syncUser();
   }, []);
 
   const login = (session: UserSession) => {

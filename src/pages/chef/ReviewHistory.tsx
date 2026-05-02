@@ -17,6 +17,7 @@ import {
 import { db } from '../../lib/firebase';
 import { Review, User, Recipe, Order } from '../../types';
 import { motion } from 'motion/react';
+import Avatar from '../../components/Avatar';
 import { 
   Star, 
   Utensils,
@@ -186,6 +187,12 @@ export default function ReviewHistory() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-1.5">
                       <div className="flex items-center gap-3">
+                        <Avatar 
+                          src={kid?.avatar || review.authorAvatar} 
+                          name={kid?.name || review.authorName} 
+                          size={32} 
+                          className="rounded-lg shadow-sm"
+                        />
                         <span className="text-[15px] font-bold text-foreground">
                           {kid?.name ? `Bé ${kid.name}` : `Bé ${review.authorName}`}
                         </span>

@@ -65,7 +65,7 @@ export default function Favorites() {
       <header className="flex items-center justify-between mb-8">
         <div className="flex-1">
           <h1 className="text-[22px] font-black text-foreground tracking-tight">Món bé thích</h1>
-          <p className="text-[13px] text-muted-foreground font-medium mt-0.5">Những món bé đã tim ❤️</p>
+          <p className="text-[13px] text-muted-foreground font-medium mt-0.5">Những món bé thích</p>
         </div>
         {favoriteRecipes.length > 0 && (
           <div className="bg-accent text-accent-foreground px-4 py-2 rounded-2xl text-[12px] font-black uppercase tracking-widest border border-accent/20 shadow-sm">
@@ -76,8 +76,8 @@ export default function Favorites() {
 
       {favoriteRecipes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center bg-card rounded-[32px] border border-border shadow-sm px-6">
-          <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center mb-6 text-3xl">
-            💝
+          <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center mb-6 text-primary">
+            <Heart size={40} className="fill-primary/20" />
           </div>
           <h3 className="text-lg font-bold text-foreground">Bé chưa thích món nào</h3>
           <p className="text-muted-foreground mt-1 mb-8 text-sm max-w-[240px] mx-auto leading-relaxed">
@@ -130,11 +130,15 @@ export default function Favorites() {
                 </h4>
                 <div className="mt-auto flex items-center justify-between text-[10px] md:text-[11px] font-black uppercase tracking-widest">
                   <div className="flex items-center gap-1.5 text-primary">
-                    <span className="text-sm">★</span>
+                    <Star 
+                  size={16} 
+                  className={`text-primary fill-primary`}
+                  strokeWidth={1}
+                />
                     <span>{recipe.avgRating?.toFixed(1) || '5.0'}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <span className="text-[14px]">❤️</span>
+                    <Heart size={16} className="fill-destructive text-destructive" />
                     <span>{recipe.favoriteCount || 0}</span>
                   </div>
                 </div>

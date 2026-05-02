@@ -101,6 +101,7 @@ export default function Login() {
         username: userData.username,
         role: userData.role,
         name: userData.name,
+        avatar: userData.avatar || null,
       };
 
       login(session);

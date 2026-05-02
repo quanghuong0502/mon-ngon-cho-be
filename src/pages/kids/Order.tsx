@@ -21,14 +21,16 @@ import { Recipe, WeeklyMenu, Order } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Check, 
-  ChefHat, 
-  Loader2, 
-  Star, 
+  Check,
+  ChefHat,
+  Loader2,
+  Star,
   Info,
   Heart,
   CircleCheckBig,
-  UtensilsCrossed
+  UtensilsCrossed,
+  Trash2,
+  Utensils
 } from 'lucide-react';
 import { format, startOfWeek, addDays, isBefore, startOfDay, addWeeks, isSameDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -362,7 +364,7 @@ export default function KidsOrder() {
           status: 'pending',
           updatedAt: now
         });
-        toast.success(`Đã cập nhật món cho ${ALL_DAYS.find(d => d.key === day)?.label}! 🎉`, { id: loadingToast });
+        toast.success(`Đã cập nhật món cho ${ALL_DAYS.find(d => d.key === day)?.label}!`, { id: loadingToast });
       } else {
         const orderData: Omit<Order, 'id'> = {
           kidId: user.userId,
@@ -374,7 +376,7 @@ export default function KidsOrder() {
           updatedAt: now
         };
         await addDoc(collection(db, 'orders'), orderData);
-        toast.success('Đặt món thành công! 🎉', { id: loadingToast });
+        toast.success('Đặt món thành công!', { id: loadingToast });
       }
       setTempSelections(prev => {
         const next = { ...prev };
@@ -406,9 +408,9 @@ export default function KidsOrder() {
   };
 
   const lockMessages: Record<string, string> = {
-    preparing: "🔒 Đang làm, không thể thay đổi",
-    ready: "🔒 Sẵn sàng rồi, qua lấy nhé!",
-    done: "✓ Hoàn thành"
+    preparing: "Đang làm, không thể thay đổi",
+    ready: "Sẵn sàng rồi, qua lấy nhé!",
+    done: "Hoàn thành"
   };
 
   const statusColors: Record<string, string> = {
@@ -480,16 +482,16 @@ export default function KidsOrder() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto">
           {/* Title + subtitle - non-sticky, scrolls */}
-          <div className="px-4 md:px-6 pt-4 mb-4">
+          <div className="px-4 md:px-6 pt-4 pb-2">
             <h1 className="text-[18px] md:text-[20px] font-semibold text-foreground">Thực đơn hàng ngày</h1>
             <p className="text-[13px] font-normal text-muted-foreground">
-              Chọn món bé muốn ăn cho từng ngày và nhấn xác nhận nhé!
+              Chọn món bé muốn ăn cho từng ngày nhé!
             </p>
           </div>
 
           {/* Sticky Week Badge for Mobile */}
-          <div className="sticky top-0 z-[29] bg-background px-4 pt-4 pb-2 md:hidden">
-            <div className="inline-flex items-center gap-3 bg-card px-4 py-2 rounded-2xl shadow-sm border border-border w-full">
+          <div className="sticky top-0 z-[29] bg-background px-2 pt-2 pb-4 md:hidden flex justify-center">
+            <div className="inline-flex items-center gap-3 bg-card px-4 py-2 rounded-2xl shadow-sm border border-border">
               <span className="bg-primary text-primary-foreground font-black text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-lg">
                 TUẦN {weekId.split('-')[1]}
               </span>
@@ -670,18 +672,19 @@ export default function KidsOrder() {
                         {order.status === 'preparing' && (
                           <div className="bg-primary/10 text-primary px-4 py-1.5 rounded-full text-[13px] font-medium border border-primary/20 flex items-center gap-2">
                              <Loader2 size={12} className="animate-spin" />
-                             Đang nấu... 🥘
+                             Đang nấu...
                           </div>
                         )}
                         {order.status === 'ready' && (
-                          <div className="bg-green-50 text-green-600 px-4 py-1.5 rounded-full text-[13px] font-bold border border-green-100 animate-bounce flex items-center gap-2">
-                            <Check size={14} strokeWidth={3} />
-                            Sẵn sàng! 🍱
+                          <div className="bg-green-50 text-green-600 px-4 py-1.5 rounded-full text-[13px] font-black border border-green-100 animate-bounce flex items-center gap-2 shadow-sm">
+                            <Utensils size={14} strokeWidth={3} />
+                            Sẵn sàng!
                           </div>
                         )}
                         {order.status === 'done' && (
-                          <div className="bg-secondary text-muted-foreground px-4 py-1.5 rounded-full text-[13px] font-medium border border-border">
-                            Hoàn thành ✓
+                          <div className="bg-secondary text-muted-foreground px-4 py-1.5 rounded-full text-[13px] font-medium border border-border flex items-center gap-2">
+                            <CircleCheckBig size={14} />
+                            Hoàn thành
                           </div>
                         )}
                       </div>
@@ -697,7 +700,12 @@ export default function KidsOrder() {
                           disabled={submitting[day.key]}
                           className="fixed bottom-[86px] left-4 right-4 h-[52px] bg-primary text-primary-foreground font-semibold rounded-[14px] shadow-xl z-40 flex items-center justify-center gap-2 text-[15px]"
                         >
-                          {submitting[day.key] ? <Loader2 size={20} className="animate-spin" /> : <span>Xác nhận đặt món ✓</span>}
+                          {submitting[day.key] ? <Loader2 size={20} className="animate-spin" /> : (
+                            <div className="flex items-center gap-2">
+                              Xác nhận đặt món
+                              <CircleCheckBig size={20} />
+                            </div>
+                          )}
                         </motion.button>
                       )}
                     </AnimatePresence>
@@ -849,7 +857,7 @@ export default function KidsOrder() {
         isOpen={cancelModal.isOpen}
         onClose={() => setCancelModal({ isOpen: false, day: null })}
         onConfirm={executeCancel}
-        icon="🗑️"
+        icon={<Trash2 size={24} className="text-destructive" />}
         title="Huỷ đặt món?"
         message={
           cancelModal.day 

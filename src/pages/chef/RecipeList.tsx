@@ -321,7 +321,7 @@ export default function RecipeList() {
               className="px-4 py-3 bg-secondary border border-border rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground"
             >
               <option value="newest">Mới nhất</option>
-              <option value="popular">Phổ biến nhất ❤️</option>
+              <option value="popular">Phổ biến nhất</option>
             </select>
             <div className="h-8 w-px bg-border hidden md:block" />
             <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
@@ -447,7 +447,7 @@ export default function RecipeList() {
         isOpen={!!deleteConfirm}
         onClose={() => setDeleteConfirm(null)}
         onConfirm={() => deleteConfirm && handleDelete(deleteConfirm)}
-        icon="🗑️"
+        icon={<Trash2 size={24} className="text-destructive" />}
         title="Xác nhận xóa?"
         message="Hành động này không thể hoàn tác. Công thức sẽ bị xóa vĩnh viễn khỏi thư viện."
         confirmText="Xóa ngay"

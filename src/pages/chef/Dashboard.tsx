@@ -36,7 +36,12 @@ import {
   Heart,
   TrendingUp,
   ChefHat,
-  X
+  X,
+  Bell,
+  Trophy,
+  Navigation,
+  Sparkles,
+  CircleCheckBig
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -261,7 +266,7 @@ export default function ChefDashboard() {
       // Check current browser permission
       if (typeof Notification !== 'undefined') {
         if (Notification.permission === 'denied') {
-          alert('Vui lòng bật thông báo trong cài đặt trình duyệt để nhận tin nhắn từ các bé nhé! 😊');
+          alert('Vui lòng bật thông báo trong cài đặt trình duyệt để nhận tin nhắn từ các bé nhé!');
           setShowChefBanner(false);
           return;
         }
@@ -306,11 +311,14 @@ export default function ChefDashboard() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex items-center gap-4 mb-4 relative overflow-hidden"
           >
-            <span style={{ fontSize: 24 }}>🔔</span>
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+              <Bell size={20} />
+            </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 500 }} className="text-foreground">Bật thông báo nhé!</div>
-              <div style={{ fontSize: 12 }} className="text-muted-foreground">
-                Đầu bếp sẽ biết ngay khi bé đến lấy món 🍳
+              <div style={{ fontSize: 12 }} className="text-muted-foreground flex items-center gap-1.5">
+                <ChefHat size={14} className="text-primary/60" />
+                Đầu bếp sẽ biết ngay khi bé đến lấy món
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -391,8 +399,18 @@ export default function ChefDashboard() {
                                 {order.createdAt ? format(order.createdAt.toDate(), 'HH:mm', { locale: vi }) : '--:--'}
                               </span>
                             </div>
-                            <h3 className="font-bold text-foreground mt-1">Đơn hàng #{order.id?.slice(-4)}</h3>
-                            <p className="text-xs text-muted-foreground mt-0.5">Cho: {kidProfiles[order.kidId]?.name ? `Bé ${kidProfiles[order.kidId].name}` : `Bé ${order.kidId}`}</p>
+                            <div className="flex items-center gap-3">
+                              <Avatar 
+                                src={kidProfiles[order.kidId]?.avatar} 
+                                name={kidProfiles[order.kidId]?.name || order.kidId} 
+                                size={32} 
+                                className="rounded-xl border border-border"
+                              />
+                              <div>
+                                <h3 className="font-bold text-foreground">Đơn hàng #{order.id?.slice(-4)}</h3>
+                                <p className="text-xs text-muted-foreground">Cho: {kidProfiles[order.kidId]?.name ? `Bé ${kidProfiles[order.kidId].name}` : `Bé ${order.kidId}`}</p>
+                              </div>
+                            </div>
                           </div>
                           <div className="flex gap-2">
                             {order.status === 'pending' && (
@@ -417,16 +435,17 @@ export default function ChefDashboard() {
                               </span>
                             )}
                             {order.status === 'on_the_way' && (
-                              <span className="text-[11px] font-bold text-sky-500 bg-sky-500/10 px-3 py-2 rounded-xl">
-                                🚶 Bé đang đến
+                              <span className="text-[11px] font-bold text-sky-500 bg-sky-500/10 px-3 py-2 rounded-xl flex items-center gap-1.5">
+                                <Navigation size={12} className="rotate-45" /> Bé đang đến
                               </span>
                             )}
                             {order.status === 'arrived' && (
                               <button 
                                 onClick={() => updateStatus(order.id!, 'done')}
-                                className="px-4 py-2 bg-orange-500 text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-900/20"
+                                className="px-4 py-2 bg-orange-500 text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-900/20 flex items-center gap-2"
                               >
-                                Xác nhận đã giao ✓
+                                Xác nhận đã giao
+                                <CircleCheckBig size={14} />
                               </button>
                             )}
                           </div>
@@ -474,7 +493,7 @@ export default function ChefDashboard() {
                         className="bg-card p-4 rounded-xl border border-border hover:border-primary/50 transition-all flex gap-4 group"
                       >
                         <Avatar 
-                          src={kid?.avatar} 
+                          src={kid?.avatar || review.authorAvatar} 
                           name={kid?.name || review.authorName} 
                           size={40} 
                           className="shrink-0"
@@ -540,7 +559,7 @@ export default function ChefDashboard() {
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
-                  Top món được yêu thích 🏆
+                  Top món được yêu thích <Trophy className="text-amber-500" />
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">Dựa trên lượt tim của các bé</p>
               </div>

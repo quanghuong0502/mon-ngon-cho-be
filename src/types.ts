@@ -43,6 +43,10 @@ export interface Recipe {
   avgRating: number;
   totalRatings: number;
   favoriteCount?: number;
+  reviewTags?: {
+    star: number;
+    tags: string[];
+  }[];
 }
 
 export interface WeeklyMenu {
@@ -76,6 +80,7 @@ export interface Review {
   recipeId: string;
   authorId: string;
   authorName: string;
+  authorAvatar?: string;
   authorRole: UserRole;
   rating?: number; // Optional for replies
   comment: string;

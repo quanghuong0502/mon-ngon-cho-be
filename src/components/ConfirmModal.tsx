@@ -1,11 +1,13 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
+import { AlertTriangle } from 'lucide-react';
+
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  icon?: string;
+  icon?: React.ReactNode;
   title: string;
   message: string;
   confirmText?: string;
@@ -17,7 +19,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  icon = '⚠️',
+  icon,
   title,
   message,
   confirmText = 'Xác nhận',
@@ -59,8 +61,8 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
               className="bg-card rounded-[32px] p-8 w-full max-w-[360px] shadow-2xl pointer-events-auto flex flex-col items-center border border-border"
             >
               {/* Icon */}
-              <div className="w-[48px] h-[48px] rounded-full bg-primary/10 flex items-center justify-center text-[24px] mb-4">
-                {icon}
+              <div className="w-[48px] h-[48px] rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                {icon || <AlertTriangle size={24} className="text-primary" />}
               </div>
 
               {/* Title */}

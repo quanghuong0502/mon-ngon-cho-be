@@ -24,7 +24,8 @@ import {
   X,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  Trophy
 } from 'lucide-react';
 import { clearSession } from '../lib/auth';
 import { useAuth } from '../context/AuthContext';
@@ -52,6 +53,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { to: '/chef/menu', label: 'Thực đơn tuần', icon: Calendar },
     { to: '/chef/orders', label: 'Đơn hàng', icon: ClipboardList },
     { to: '/chef/news', label: 'Tin tức', icon: Newspaper },
+    { to: '/chef/achievements', label: 'Thành tích', icon: Trophy },
     { to: '/chef/settings', label: 'Cài đặt', icon: Settings },
   ];
 
@@ -145,6 +147,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span>Món ngon cho bé</span>
           </Link>
           <div className="flex items-center space-x-2">
+            
+            <div className="bg-card px-3 py-1 rounded-full border border-border text-xs text-primary font-bold">
+              Tuần {getWeek(new Date())}
+            </div>
             <button
               onClick={toggleTheme}
               className="p-2 text-muted-foreground hover:text-primary transition-colors hover:bg-secondary rounded-full"
@@ -152,9 +158,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               <ThemeIcon size={20} />
             </button>
-            <div className="bg-card px-3 py-1 rounded-full border border-border text-xs text-primary font-bold">
-              Tuần {getWeek(new Date())}
-            </div>
             <button
               onClick={handleLogout}
               className="p-2 text-muted-foreground hover:text-destructive transition-colors"
@@ -165,7 +168,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-y-auto">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}

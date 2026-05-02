@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   collection, 
   query, 
@@ -23,25 +23,39 @@ import { Order, Recipe, Review, UserSession } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Clock, 
-  ChefHat, 
-  Utensils, 
-  CircleCheckBig, 
-  Star, 
+  Plus, 
+  Trash2, 
+  Edit3, 
+  Image as ImageIcon, 
+  X, 
+  Save, 
+  Loader2,
+  AlertTriangle,
+  Upload,
+  Megaphone,
+  Bell,
+  Flame,
+  Star as StarIcon,
+  Target,
+  Trophy,
+  History,
+  Info,
+  Sparkles,
+  Inbox,
+  Navigation,
+  MapPin,
+  UtensilsCrossed,
+  Clock,
+  ChefHat,
+  Utensils,
+  CircleCheckBig,
+  Star,
   MessageSquare,
   ChevronRight,
   ChevronLeft,
   TrendingUp,
-  X,
-  Loader2,
   Calendar,
-  Image as ImageIcon,
-  Plus,
-  Trash2,
-  Maximize2,
-  MapPin,
-  Navigation,
-  UtensilsCrossed
+  Maximize2
 } from 'lucide-react';
 import { format, startOfWeek, addDays, getWeek } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -54,34 +68,99 @@ import BottomSheet from '../../components/BottomSheet';
 interface ReviewModalProps {
   recipe: Recipe;
   orderId: string;
+  orderDate: Date;
+  orderDay: string;
   user: UserSession;
   existingReview?: Review;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess }: ReviewModalProps) {
+function ReviewModal({ recipe, orderId, orderDate, orderDay, user, existingReview, onClose, onSuccess }: ReviewModalProps) {
   const [rating, setRating] = useState(existingReview?.rating || 0);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState(existingReview?.comment || '');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>(existingReview?.imageUrls || []);
   const [submitting, setSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useLockBodyScroll(true);
 
   const isReadOnly = !!existingReview;
 
   const ratingLabels: Record<number, string> = {
-    1: 'Không ngon 😞',
-    2: 'Tạm được 😐',
-    3: 'Khá ngon 🙂',
-    4: 'Rất ngon 😍',
-    5: 'Tuyệt vời! 🤩',
+    1: 'Không ngon',
+    2: 'Tạm được',
+    3: 'Khá ngon',
+    4: 'Rất ngon',
+    5: 'Tuyệt vời!',
   };
 
-  const suggestions = ['Ngon tuyệt!', 'Rất thích!', 'Trang trí đẹp', 'Hơi mặn', 'Hơi cay', 'Nhiều đồ ăn'];
+  const getTagsByRating = (r: number) => {
+    const custom = recipe.reviewTags;
+    
+    // Find a matching rule based on exact star rating
+    if (custom && Array.isArray(custom)) {
+      const match = custom.find(rule => r === rule.star);
+      if (match && match.tags.length > 0) return match.tags;
+    }
+
+    // Default fallbacks if no custom rule matches
+    if (r === 5) return ['Ngon tuyệt! 😋', 'Rất thích! ❤️', 'Trang trí đẹp', 'Nhiều đồ ăn'];
+    if (r >= 3) return ['Khá ngon', 'Bình thường', 'Hơi mặn', 'Hơi cay'];
+    if (r >= 1) return ['Không ngon', 'Ít đồ ăn', 'Quá mặn', 'Quá cay'];
+    return [];
+  };
+
+  const suggestions = getTagsByRating(rating);
+
+  // Synchronize selected tags with comment text whenever either changes
+  useEffect(() => {
+    if (isReadOnly) return;
+    const activeTags = suggestions.filter(tag => comment.includes(tag));
+    setSelectedTags(activeTags);
+  }, [comment, suggestions, isReadOnly]);
+
+  const handleTagClick = (tag: string) => {
+    if (isReadOnly) return;
+    
+    const isSelected = selectedTags.includes(tag);
+    
+    if (isSelected) {
+      setComment(prev => {
+        const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Handle removing the tag and punctuation correctly
+        let newComment = prev;
+        // Try removing with leading comma
+        newComment = newComment.replace(new RegExp(`,\\s*${escapedTag}`, 'g'), '');
+        // Try removing with trailing comma
+        newComment = newComment.replace(new RegExp(`${escapedTag},\\s*`, 'g'), '');
+        // Try removing exact match
+        newComment = newComment.replace(new RegExp(`^${escapedTag}$`, 'g'), '');
+        return newComment.trim();
+      });
+    } else {
+      // Auto-append logic with comma
+      setComment(prev => {
+        const trimmed = prev.trim();
+        if (!trimmed) return tag;
+        return `${trimmed}, ${tag}`;
+      });
+    }
+
+    // Auto-expand textarea
+    if (textareaRef.current) {
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+        }
+      }, 0);
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -107,7 +186,7 @@ function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting || rating === 0) return;
+    if (submitting || rating === 0 || !comment.trim()) return;
 
     setSubmitting(true);
     const toastId = toast.loading('Đang gửi đánh giá...');
@@ -131,6 +210,7 @@ function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess
         orderId,
         authorId: user.userId,
         authorName: user.name,
+        authorAvatar: user.avatar || null,
         authorRole: user.role,
         rating,
         comment,
@@ -153,17 +233,21 @@ function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess
         });
       }
 
-      toast.success('Cảm ơn bé đã đánh giá nhé! 💖', { id: toastId });
+      toast.success('Cảm ơn bé đã đánh giá nhé!', { id: toastId });
       setIsSuccess(true);
 
       try {
         const chefIds = await getChefOneSignalIds();
         if (chefIds.length > 0) {
-          const stars = '⭐'.repeat(rating);
+          const starsLabel = `${rating} sao`;
+          const shortComment = comment 
+            ? (comment.length > 80 ? comment.substring(0, 77) + '...' : comment)
+            : 'Không có bình luận';
+
           await sendPushToUser(
             chefIds,
-            `${user.name || 'Bé'} đã đánh giá món ăn! ${stars}`,
-            `"${comment || 'Không có bình luận'}" — món ${recipe.title}`,
+            `Bé ${user.name || ''} đã đánh giá món ăn! ${starsLabel}`,
+            `"${shortComment}" — món ${recipe.title}`,
             '/chef/reviews'
           );
         }
@@ -189,29 +273,32 @@ function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess
           <motion.div 
             initial={{ scale: 0 }}
             animate={{ scale: [0, 1.2, 1], rotate: [0, 10, 0] }}
-            className="w-24 h-24 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 mx-auto mb-6 text-5xl"
+            className="w-24 h-24 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 mx-auto mb-6"
           >
-            🎉
+            <Sparkles size={48} />
           </motion.div>
           <h2 className="text-2xl font-black text-foreground mb-2">Tuyệt vời!</h2>
-          <p className="text-muted-foreground font-medium px-4">Cảm ơn bé đã gửi đánh giá cho đầu bếp nhé! Bé thật ngoan 💖</p>
+          <p className="text-muted-foreground font-medium px-4">Cảm ơn bé đã gửi đánh giá cho đầu bếp nhé! Bé thật ngoan</p>
         </div>
       </BottomSheet>
     );
   }
 
   const Header = (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-4 text-left">
-        <div className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center text-primary">
-          <MessageSquare size={24} />
-        </div>
-        <div>
-          <h2 className="text-lg font-black text-foreground leading-tight">
-            {isReadOnly ? 'Đánh giá món' : 'Cảm nhận của bé'}
-          </h2>
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mt-0.5">
-            Món {recipe.title}
+    <div className="flex items-center gap-4 text-left">
+      <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-primary shadow-sm border border-primary/10">
+        <MessageSquare size={20} />
+      </div>
+      <div>
+        <h2 className="text-[17px] font-black text-foreground leading-tight">
+          {isReadOnly ? 'Đánh giá món' : 'Bé thấy món thế nào?'}
+        </h2>
+        <div className="flex flex-col mt-0.5">
+          <p className="text-[14px] font-black text-primary leading-tight">
+            {recipe.title}
+          </p>
+          <p className="text-[12px] font-medium text-muted-foreground mt-0.5">
+            {orderDay}, {format(orderDate, 'dd/MM')}
           </p>
         </div>
       </div>
@@ -223,7 +310,7 @@ function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess
       {isReadOnly ? (
         <button 
           onClick={onClose}
-          className="w-full h-[56px] bg-secondary text-muted-foreground font-black rounded-2xl hover:opacity-80 transition-all uppercase tracking-widest text-xs active:scale-[0.98]"
+          className="w-full h-12 bg-secondary text-muted-foreground font-black rounded-[14px] hover:opacity-80 transition-all uppercase tracking-widest text-[13px] active:scale-[0.98]"
         >
           Đóng
         </button>
@@ -231,19 +318,21 @@ function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess
         <button 
           form="review-form"
           type="submit"
-          disabled={submitting || rating === 0}
-          className={`w-full h-[56px] rounded-2xl font-black uppercase tracking-[0.15em] text-xs flex items-center justify-center gap-3 transition-all shadow-xl active:scale-[0.98] ${
-            rating === 0 
-            ? 'bg-muted text-muted-foreground cursor-not-allowed shadow-none' 
-            : 'bg-primary text-primary-foreground shadow-primary-shadow/50 hover:opacity-90'
+          disabled={submitting || rating === 0 || !comment.trim()}
+          className={`w-full h-12 rounded-[14px] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2.5 transition-all shadow-xl active:scale-[0.98] ${
+            rating === 0 || !comment.trim()
+            ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+            : 'bg-primary text-primary-foreground shadow-primary-shadow/30 hover:opacity-95'
           }`}
         >
           {submitting ? (
-            <Loader2 className="animate-spin" size={20} />
+            <>
+              <Loader2 className="animate-spin" size={18} />
+              Đang gửi...
+            </>
           ) : (
             <>
-              <CircleCheckBig size={20} />
-              Gửi đánh giá ngay
+              Gửi đánh giá cho Đầu bếp 🍱
             </>
           )}
         </button>
@@ -258,10 +347,10 @@ function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess
       title={Header}
       footer={Footer}
     >
-      <div className="space-y-7 px-8 py-4">
+      <div className="space-y-4 px-6 md:px-8 py-6">
         {/* Rating Section */}
         <div className="text-center">
-          <div className="flex justify-center gap-2 mb-1.5">
+          <div className="flex justify-center gap-2 pb-2">
             {[1, 2, 3, 4, 5].map(star => (
               <motion.button 
                 key={star} 
@@ -279,9 +368,9 @@ function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess
                   className={`transition-colors duration-200 ${
                     star <= (hoverRating || rating) 
                       ? 'text-primary fill-primary' 
-                      : 'text-muted/20 fill-muted/20'
+                      : 'text-[#FED7AA] fill-none'
                   }`}
-                  strokeWidth={star <= (hoverRating || rating) ? 2 : 1}
+                  strokeWidth={star <= (hoverRating || rating) ? 2 : 1.5}
                 />
               </motion.button>
             ))}
@@ -293,7 +382,7 @@ function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="text-xs font-black text-primary"
+                className="text-[13px] font-black text-primary"
               >
                 {ratingLabels[hoverRating || rating]}
               </motion.p>
@@ -301,16 +390,14 @@ function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess
           </AnimatePresence>
         </div>
 
-        <div className="h-px bg-border w-full" />
-
         {/* Input & Upload Sections */}
-        <form id="review-form" onSubmit={handleSubmit} className="space-y-6">
+        <form id="review-form" onSubmit={handleSubmit} className="space-y-4">
           {isReadOnly ? (
-            <div className="space-y-6 text-left">
+            <div className="space-y-4 text-left">
               {previews.length > 0 && (
                 <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-2 block mb-2">Ảnh của bé</label>
-                  <div className="flex flex-wrap gap-2.5">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-1.5 block mb-2">Ảnh của bé</label>
+                  <div className="flex flex-wrap gap-2">
                     {previews.map((preview, i) => (
                       <div key={i} className="relative w-20 h-20 rounded-2xl overflow-hidden shadow-sm border border-border">
                         <img src={getOptimizedUrl(preview, 300)} className="w-full h-full object-cover" />
@@ -322,30 +409,28 @@ function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess
               
               {comment && (
                 <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-2 block mb-2">Cảm nhận của bé</label>
-                  <div className="w-full p-5 bg-secondary border border-border rounded-3xl text-foreground text-[14px] leading-relaxed italic">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-1.5 block mb-2">Cảm nhận của bé</label>
+                  <div className="w-full p-4 bg-secondary border border-border rounded-2xl text-foreground text-[14px] leading-relaxed italic">
                     "{comment}"
                   </div>
                 </div>
               )}
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Upload Section */}
-              <div className="text-left space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-2 block">
-                  {images.length > 0 ? 'Ảnh của bé' : 'Thêm ảnh (tùy chọn)'}
+              <div className="text-left space-y-3">
+                <label className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-1.5 block">
+                  {images.length > 0 ? 'Ảnh của bé' : 'Thêm ảnh'}
                 </label>
                 <div className="flex flex-wrap gap-3">
                   {previews.map((preview, i) => (
-                    <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden bg-secondary border border-border group">
+                    <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden bg-secondary border border-border">
                       <img src={preview} className="w-full h-full object-cover" />
                       <motion.button 
-                        initial={{ opacity: 0, scale: 0.5 }}
-                        animate={{ opacity: 1, scale: 1 }}
                         type="button"
                         onClick={() => removeImage(i)}
-                        className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-lg"
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-lg"
                       >
                         <X size={10} />
                       </motion.button>
@@ -354,39 +439,58 @@ function ReviewModal({ recipe, orderId, user, existingReview, onClose, onSuccess
                   
                   {images.length < 3 && (
                     <label className="w-16 h-16 rounded-xl border-2 border-dashed border-primary/30 bg-secondary flex flex-col items-center justify-center gap-1 text-primary hover:border-primary hover:bg-secondary transition-all cursor-pointer group">
-                      <ImageIcon size={20} className="group-hover:scale-110 transition-transform" />
-                      <span className="text-[8px] font-black uppercase tracking-tight">Thêm ảnh</span>
+                      <ImageIcon size={20} />
                       <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageChange} />
                     </label>
                   )}
                 </div>
               </div>
 
+            
+
               {/* Comment Section */}
-              <div className="space-y-2 text-left">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-2 block">Cảm nhận</label>
-                <div className="space-y-2.5">
-                  <textarea 
-                    value={comment}
-                    onChange={e => setComment(e.target.value)}
-                    placeholder="Món này ngon quá ạ! Bé rất thích..."
-                    className="w-full p-5 bg-secondary border border-border rounded-[24px] outline-none focus:border-primary transition-all min-h-[90px] resize-none text-foreground text-sm leading-relaxed"
-                  />
-                  
-                  <div className="flex flex-wrap gap-1.5 px-1">
-                    {suggestions.map(s => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setComment(prev => prev ? `${prev} ${s}` : s)}
-                        className="px-3 py-1 rounded-full bg-card border border-border text-[10px] font-bold text-muted-foreground hover:border-primary hover:text-primary hover:bg-secondary transition-all active:scale-95 shadow-sm"
-                      >
-                        {s}
-                      </button>
-                    ))}
+              <div className="space-y-3 text-left">
+                <label className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-1.5 block">
+                  Cảm nhận <span className="text-destructive">*</span>
+                </label>
+                <textarea 
+                  ref={textareaRef}
+                  value={comment}
+                  onChange={e => {
+                    setComment(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                  }}
+                  placeholder="Món này ngon quá ạ! Bé rất thích..."
+                  className="w-full p-4 bg-secondary border border-border rounded-[20px] outline-none focus:border-primary transition-all min-h-[100px] max-h-[160px] resize-none text-foreground leading-relaxed text-based w-full p-3 leading-snug text-base"
+                />
+              </div>
+
+                {/* Quick Tags */}
+              {rating > 0 && (
+                <div className="space-y-3">
+                  <label className="text-[13px] font-medium text-muted-foreground ml-1.5 block">Chọn nhanh 👇</label>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestions.map(s => {
+                      const isSelected = selectedTags.includes(s);
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => handleTagClick(s)}
+                          className={`px-3.5 py-1.5 rounded-full text-[13px] font-bold transition-all active:scale-95 border ${
+                            isSelected 
+                            ? 'bg-primary border-primary text-primary-foreground cursor-pointer shadow-none' 
+                            : 'bg-white border-gray-200 text-gray-700 hover:border-primary hover:text-primary cursor-pointer shadow-sm'
+                          }`}
+                        >
+                          {isSelected ? `✓ ${s}` : s}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </form>
@@ -406,7 +510,7 @@ export default function MyOrders() {
   const [loading, setLoading] = useState(true);
   const [kitchenConfig, setKitchenConfig] = useState<any>(null);
   const [isKitchenOpen, setIsKitchenOpen] = useState(false);
-  const [reviewingMeal, setReviewingMeal] = useState<{ recipe: Recipe, orderId: string } | null>(null);
+  const [reviewingMeal, setReviewingMeal] = useState<{ recipe: Recipe, orderId: string, orderDate: Date, orderDay: string } | null>(null);
   const [selectedImages, setSelectedImages] = useState<string[] | null>(null);
   const [weekIdx, setWeekIdx] = useState(0);
   const [reviewFilter, setReviewFilter] = useState<'all' | 'unreviewed' | 'reviewed'>('all');
@@ -470,11 +574,11 @@ export default function MyOrders() {
 
         const messages: Record<string, { title: string; body: string }> = {
           on_the_way: {
-            title: `Bé ${kidName} đang trên đường! 🚶`,
+            title: `Bé ${kidName} đang trên đường!`,
             body: `Bé đang đến lấy món ${recipeName}. Chuẩn bị nhé!`
           },
           arrived: {
-            title: `Bé ${kidName} đã tới bếp! 📍🔔`,
+            title: `Bé ${kidName} đã tới bếp!`,
             body: `Bé đang chờ nhận món ${recipeName}. Giao món thôi!`
           }
         };
@@ -627,7 +731,7 @@ export default function MyOrders() {
 
   return (
     <div className="h-full overflow-y-auto scrollbar-hide kid-page-content">
-      <div className="max-w-[680px] mx-auto space-y-[2px] mb-6">
+      <div className="max-w-[680px] mx-auto space-y-[2px]">
           <h1 className="text-[20px] font-semibold text-foreground">
             {isReviewsPage ? 'Lịch sử đánh giá' : 'Món Bé đã đặt'}
           </h1>
@@ -637,59 +741,62 @@ export default function MyOrders() {
         </div>
 
         <div className="max-w-[680px] mx-auto pb-20">
-          {/* Week Selector - Moved to top */}
+          {/* Week Selector - Sticky */}
           {weeks.length > 0 && (
-            <div className="flex flex-col gap-6 mb-8">
-              <div className="flex items-center justify-center gap-4">
-                <button 
-                  onClick={() => setWeekIdx(prev => Math.min(weeks.length - 1, prev + 1))}
-                  disabled={weekIdx === weeks.length - 1}
-                  className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-primary disabled:opacity-30 disabled:pointer-events-none transition-all shadow-sm"
-                >
-                  <ChevronLeft size={20} />
-                </button>
+            <div className="sticky top-0 z-[28] bg-background pb-6 pt-6">
+              <div className="flex flex-col gap-6">
+                <div className="flex items-center justify-center gap-4">
+                  <button 
+                    onClick={() => setWeekIdx(prev => Math.min(weeks.length - 1, prev + 1))}
+                    disabled={weekIdx === weeks.length - 1}
+                    className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-primary disabled:opacity-30 disabled:pointer-events-none transition-all shadow-sm"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
 
-                <div className="flex items-center gap-2 bg-card px-6 py-2.5 rounded-xl shadow-sm border border-border font-black text-xs text-primary">
-                  <Calendar size={16} />
-                  <span className="uppercase tracking-widest">TUẦN {weekNumber}</span>
+                  <div className="flex items-center gap-2 bg-card px-6 py-2.5 rounded-xl shadow-sm border border-border font-black text-xs text-primary">
+                    <Calendar size={16} />
+                    <span className="uppercase tracking-widest">TUẦN {weekNumber}</span>
+                  </div>
+
+                  <button 
+                    onClick={() => setWeekIdx(prev => Math.max(0, prev - 1))}
+                    disabled={weekIdx === 0}
+                    className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-primary disabled:opacity-30 disabled:pointer-events-none transition-all shadow-sm"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
                 </div>
 
-                <button 
-                  onClick={() => setWeekIdx(prev => Math.max(0, prev - 1))}
-                  disabled={weekIdx === 0}
-                  className="w-10 h-10 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-primary disabled:opacity-30 disabled:pointer-events-none transition-all shadow-sm"
-                >
-                  <ChevronRight size={20} />
-                </button>
+                {isReviewsPage && (
+                  <div className="flex bg-secondary p-1 rounded-2xl max-w-sm mx-auto w-full">
+                    {(['all', 'unreviewed', 'reviewed'] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setReviewFilter(f)}
+                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all ${
+                          reviewFilter === f 
+                          ? 'bg-card text-primary shadow-sm' 
+                          : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {f === 'all' && 'Tất cả'}
+                        {f === 'unreviewed' && 'Chưa đánh giá'}
+                        {f === 'reviewed' && 'Đã đánh giá'}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-
-              {isReviewsPage && (
-                <div className="flex bg-secondary p-1 rounded-2xl max-w-sm mx-auto w-full">
-                  {(['all', 'unreviewed', 'reviewed'] as const).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setReviewFilter(f)}
-                      className={`flex-1 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all ${
-                        reviewFilter === f 
-                        ? 'bg-card text-primary shadow-sm' 
-                        : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {f === 'all' && 'Tất cả'}
-                      {f === 'unreviewed' && 'Chưa đánh giá'}
-                      {f === 'reviewed' && 'Đã đánh giá'}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-transparent to-background pointer-events-none translate-y-full" />
             </div>
           )}
 
           {weekOrders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center bg-card rounded-[32px] border border-border shadow-sm px-6">
-              <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center mb-6 text-3xl">
-                {isReviewsPage ? '⭐' : '🍱'}
-              </div>
+              <div className="flex flex-col items-center justify-center py-24 text-center bg-card rounded-[32px] border border-border shadow-sm px-6">
+                <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center mb-6 text-muted-foreground/30">
+                  {isReviewsPage ? <Star size={40} /> : <Utensils size={40} />}
+                </div>
               <h3 className="text-lg font-bold text-foreground">
                 {isReviewsPage 
                   ? 'Chưa có món nào hoàn thành trong tuần này' 
@@ -712,8 +819,8 @@ export default function MyOrders() {
               )}
             </div>
           ) : (
-            <div className="space-y-6">
-              <div className="space-y-4">
+            <div className="space-y-6 mt-3">
+              <div className="space-y-5">
                 {weekOrders.map(order => {
                   const recipe = recipes[order.recipeId];
                   const statusInfo = getStatusDisplay(order.status);
@@ -731,7 +838,7 @@ export default function MyOrders() {
                       }`}
                     >
                       <div className="flex items-center justify-between mb-4">
-                        <span className="text-[12px] font-black text-muted-foreground uppercase tracking-widest">{dayLabel}</span>
+                        <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">{dayLabel}</span>
                         {!isReviewsPage && (
                           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${statusInfo.color}`}>
                             {statusInfo.icon}
@@ -770,7 +877,7 @@ export default function MyOrders() {
                                 <Star 
                                   key={star} 
                                   size={16} 
-                                  className={star <= (review?.rating || 0) ? 'text-primary fill-primary' : 'text-muted/10 fill-muted/10'} 
+                                  className={star <= (review?.rating || 0) ? 'text-primary fill-primary' : 'text-muted/20 fill-muted/5'} 
                                 />
                               ))}
                               {hasReview && (
@@ -782,7 +889,7 @@ export default function MyOrders() {
                       </div>
 
                       {isActive && (
-                        <div className="mb-5 space-y-4">
+                        <div className="mb-1 space-y-4">
                           <div className="h-px bg-border w-full" />
                           
                           {/* 3. Thông tin bếp */}
@@ -805,13 +912,14 @@ export default function MyOrders() {
                               <button
                                 disabled={!isKitchenOpen}
                                 onClick={() => updateOrderStatus(order.id!, 'on_the_way')}
-                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all ${
+                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all flex items-center justify-center gap-2 ${
                                   isKitchenOpen 
                                     ? 'bg-primary text-primary-foreground shadow-lg shadow-primary-shadow/30 hover:scale-[1.01] active:scale-[0.98]' 
                                     : 'bg-muted text-muted-foreground cursor-not-allowed'
                                 }`}
                               >
-                                Bé đang đến lấy! 🚶
+                                <Navigation size={16} />
+                                Bé đang đến lấy!
                               </button>
                             )}
 
@@ -819,13 +927,14 @@ export default function MyOrders() {
                               <button
                                 disabled={!isKitchenOpen}
                                 onClick={() => updateOrderStatus(order.id!, 'arrived')}
-                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all ${
+                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all flex items-center justify-center gap-2 ${
                                   isKitchenOpen 
                                     ? 'bg-primary text-primary-foreground shadow-lg shadow-primary-shadow/30 hover:scale-[1.01] active:scale-[0.98]' 
                                     : 'bg-muted text-muted-foreground cursor-not-allowed'
                                 }`}
                               >
-                                Bé đã tới bếp! 📍
+                                <MapPin size={16} />
+                                Bé đã tới bếp!
                               </button>
                             )}
 
@@ -851,7 +960,12 @@ export default function MyOrders() {
 
                       {(order.status === 'done' || isReviewsPage) && recipe && (
                         <button 
-                          onClick={() => setReviewingMeal({ recipe, orderId: order.id! })}
+                          onClick={() => setReviewingMeal({ 
+                            recipe, 
+                            orderId: order.id!, 
+                            orderDate: order.createdAt.toDate(),
+                            orderDay: dayLabel
+                          })}
                           className={`w-full h-12 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all border-2 flex items-center justify-center gap-2 ${
                             hasReview 
                             ? 'border-border text-muted-foreground hover:bg-secondary' 
@@ -910,6 +1024,8 @@ export default function MyOrders() {
           <ReviewModal 
             recipe={reviewingMeal.recipe}
             orderId={reviewingMeal.orderId}
+            orderDate={reviewingMeal.orderDate}
+            orderDay={reviewingMeal.orderDay}
             user={user!}
             existingReview={reviews[reviewingMeal.orderId]}
             onClose={() => setReviewingMeal(null)}

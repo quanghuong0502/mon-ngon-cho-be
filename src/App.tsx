@@ -50,6 +50,7 @@ import OrderManager from './pages/chef/OrderManager';
 import NewsManager from './pages/chef/NewsManager';
 import ReviewHistory from './pages/chef/ReviewHistory';
 import ChefSettings from './pages/chef/Settings';
+import AchievementManager from './pages/chef/AchievementManager';
 
 // Kid Pages
 import KidsHome from './pages/kids/Home';
@@ -119,6 +120,7 @@ export default function App() {
               <Route path="/chef/orders" element={<Layout><OrderManager /></Layout>} />
               <Route path="/chef/news" element={<Layout><NewsManager /></Layout>} />
               <Route path="/chef/reviews" element={<Layout><ReviewHistory /></Layout>} />
+              <Route path="/chef/achievements" element={<Layout><AchievementManager /></Layout>} />
               <Route path="/chef/settings" element={<Layout><ChefSettings /></Layout>} />
             </Route>
   

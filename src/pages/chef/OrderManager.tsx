@@ -72,7 +72,7 @@ const STATUS_CONFIG: Record<OrderStatus, { label: string, color: string, icon: a
     color: 'bg-teal-100 text-teal-700 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-800', 
     icon: MapPin,
     next: 'done',
-    buttonLabel: 'Xác nhận đã giao món ✓'
+    buttonLabel: 'Xác nhận đã giao món'
   },
   done: { 
     label: 'Hoàn thành', 
@@ -164,19 +164,20 @@ export default function OrderManager() {
         if (oneSignalIds.length > 0) {
           const recipe = recipes[order.recipeId];
           const recipeName = recipe?.title || 'món ăn';
+          const displayRecipeName = recipeName.length > 30 ? recipeName.substring(0, 27) + '...' : recipeName;
 
           const messages: Record<string, { title: string; body: string }> = {
             preparing: {
-              title: 'Đầu bếp đang nấu! 🍳',
-              body: `Món ${recipeName} đang được chuẩn bị...`
+              title: 'Đầu bếp đang nấu!',
+              body: `Món ${displayRecipeName} đang được chuẩn bị... Bé đợi xíu nhoa!`
             },
             ready: {
-              title: 'Món ăn sẵn sàng rồi! 🍱',
-              body: `Món ${recipeName} đã xong. Bé qua bếp lấy nhé!`
+              title: 'Món ăn sẵn sàng rồi!',
+              body: `Món ${displayRecipeName} đã xong. Bé qua bếp lấy nhoa!`
             },
             done: {
-              title: 'Bé đã nhận món! ✅',
-              body: 'Bé giỏi quá, đã hoàn thành bữa ăn hôm nay! 🍱'
+              title: 'Bé đã nhận món!',
+              body: 'Bé giỏi quớ, đã hoàn thành bữa ăn hôm nay!'
             }
           };
 
@@ -383,7 +384,12 @@ function OrderCard({ order, recipe, review, kid, onUpdate }: OrderCardProps) {
         )}
         {order.status === 'on_the_way' && (
           <div className="w-full py-4 flex items-center justify-center gap-2 text-primary font-bold text-sm bg-primary/10 rounded-[20px]">
-             🚶 Bé đang trên đường đến
+             <Navigation size={16} className="rotate-45 animate-pulse" /> Bé đang trên đường đến
+          </div>
+        )}
+        {order.status === 'arrived' && (
+          <div className="w-full py-4 flex items-center justify-center gap-2 text-green-600 font-bold text-sm bg-green-500/10 rounded-[20px] mb-2">
+             <MapPin size={16} className="animate-bounce" /> Bé đã tới bếp!
           </div>
         )}
         {config.next ? (

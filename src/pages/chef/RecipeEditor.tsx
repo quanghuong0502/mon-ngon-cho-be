@@ -9,12 +9,14 @@ import {
   doc, 
   getDoc, 
   setDoc, 
+  addDoc,
   serverTimestamp, 
   updateDoc,
   collection
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { uploadToCloudinary, getOptimizedUrl } from '../../lib/cloudinary';
+import { sendPushToUser, getAllKidOneSignalIds } from '../../lib/oneSignal';
 import { Recipe } from '../../types';
 import { getSession } from '../../lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
@@ -29,7 +31,9 @@ import {
   Save,
   Loader2,
   X,
-  CheckCircle2
+  CheckCircle2,
+  AlertTriangle,
+  Star
 } from 'lucide-react';
 
 interface Ingredient {
@@ -46,6 +50,7 @@ export default function RecipeEditor() {
   
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+  const [initialPublished, setInitialPublished] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const isInitialMount = useRef(true);
@@ -56,6 +61,8 @@ export default function RecipeEditor() {
   const [steps, setSteps] = useState<string[]>(['']);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [reviewTags, setReviewTags] = useState<{ star: number; tags: string[] }[]>([]);
+  const [rtInput, setRtInput] = useState<string[]>([]); // Inputs per rule
   const [isPublished, setIsPublished] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -78,11 +85,11 @@ export default function RecipeEditor() {
   }, [id]);
 
   // Record changes to trigger dirty state
-  useEffect(() => {
+      useEffect(() => {
     if (!loading && !isInitialMount.current) {
       setIsDirty(true);
     }
-  }, [title, description, ingredients, steps, tags, isPublished, imageFile]);
+  }, [title, description, ingredients, steps, tags, reviewTags, isPublished, imageFile]);
 
   // Auto-save logic
   useEffect(() => {
@@ -93,7 +100,7 @@ export default function RecipeEditor() {
         handleSave(true);
       }, 30000); // 30 seconds
     }
-  }, [title, description, ingredients, steps, tags, isPublished, imageUrl]);
+  }, [title, description, ingredients, steps, tags, reviewTags, isPublished, imageUrl]);
 
   const fetchRecipe = async () => {
     try {
@@ -113,7 +120,11 @@ export default function RecipeEditor() {
         }));
         setSteps(data.steps);
         setTags(data.tags || []);
-        setIsPublished(data.isPublished);
+        const tags = Array.isArray(data.reviewTags) ? data.reviewTags : [];
+        setReviewTags(tags);
+        setRtInput(new Array(tags.length).fill(''));
+        setIsPublished(data.isPublished || false);
+        setInitialPublished(data.isPublished || false);
         setImageUrl(data.imageUrl || '');
         setImagePreview(data.imageUrl || '');
         // Reset mount ref after data is loaded to allow dirty tracking
@@ -176,6 +187,7 @@ export default function RecipeEditor() {
         ingredients: formattedIngredients,
         steps: steps.filter(s => s.trim()),
         tags,
+        reviewTags,
         imageUrl: finalImageUrl,
         isPublished,
         updatedAt: serverTimestamp(),
@@ -191,6 +203,38 @@ export default function RecipeEditor() {
       if (isNew) {
         const newRef = doc(collection(db, 'recipes'));
         await setDoc(newRef, recipeData);
+        
+        // Auto-create news if published immediately
+        if (isPublished) {
+          const newsTitle = `Món mới cập bến: ${title}!`;
+          const newsContent = `<h2><strong>Mô tả</strong></h2><p>${description}</p><h2><strong>Nguyên liệu</strong></h2><ul>${formattedIngredients.map(i => `<li>${i}</li>`).join('')}</ul><h2><strong>Cách làm</strong></h2><ol>${steps.filter(s => s.trim()).map(s => `<li>${s}</li>`).join('')}</ol><p>Cùng chào đón món <strong>${title}</strong> cực hấp dẫn sắp có mặt tại bếp nhoa!Bé nhớ qua thử nhé. 😋</p>`;
+console.log(newsContent)
+
+          await addDoc(collection(db, 'news'), {
+            title: newsTitle,
+            content: newsContent,
+            imageUrl: finalImageUrl,
+            createdBy: session?.userId,
+            createdAt: serverTimestamp(),
+            isPinned: false
+          });
+
+          // Notify kids about the new recipe announcement
+          try {
+            const kidIds = await getAllKidOneSignalIds();
+            if (kidIds.length > 0) {
+              await sendPushToUser(
+                kidIds,
+                'Tin mới từ Đầu bếp',
+                newsTitle,
+                '/kids/home'
+              );
+            }
+          } catch (err) {
+            console.error('Notify kids error:', err);
+          }
+        }
+
         setIsDirty(false);
         if (!isAuto) {
           toast.success('Đã lưu công thức!', { duration: 2000 });
@@ -198,6 +242,44 @@ export default function RecipeEditor() {
         }
       } else {
         await updateDoc(doc(db, 'recipes', id!), recipeData);
+
+        // Auto-create news if transitioning from draft to published
+        if (isPublished && !initialPublished) {
+          const newsTitle = `Món mới: ${title}!`;
+          const newsContent = [
+            `🌟 **Mô tả:** ${description}`,
+            `📍 **Nguyên liệu:**\n${formattedIngredients.map(i => `  • ${i}`).join('\n')}`,
+            `👨‍🍳 **Cách làm:**\n${steps.filter(s => s.trim()).map((s, idx) => `  ${idx + 1}. ${s}`).join('\n')}`,
+            `\nĐầu bếp vừa mới hoàn thiện món **${title}**. Bé cùng khám phá ngay nhé! ❤️`
+          ].join('\n\n');
+
+          await addDoc(collection(db, 'news'), {
+            title: newsTitle,
+            content: newsContent,
+            imageUrl: finalImageUrl,
+            createdBy: session?.userId,
+            createdAt: serverTimestamp(),
+            isPinned: false
+          });
+
+          // Notify kids about the newly published recipe
+          try {
+            const kidIds = await getAllKidOneSignalIds();
+            if (kidIds.length > 0) {
+              await sendPushToUser(
+                kidIds,
+                'Tin mới từ Đầu bếp',
+                newsTitle,
+                '/kids/home'
+              );
+            }
+          } catch (err) {
+            console.error('Notify kids error:', err);
+          }
+
+          setInitialPublished(true);
+        }
+
         setIsDirty(false);
         if (!isAuto) {
           toast.success('Đã lưu công thức!', { duration: 2000 });
@@ -241,6 +323,53 @@ export default function RecipeEditor() {
     const newSteps = [...steps];
     newSteps[index] = value;
     setSteps(newSteps);
+    setIsDirty(true);
+  };
+
+  const addReviewRule = () => {
+    const usedStars = reviewTags.map(r => r.star);
+    const availableStar = [5, 4, 3, 2, 1].find(s => !usedStars.includes(s));
+    
+    if (!availableStar) {
+      toast.error('Tất cả số sao đều đã có gợi ý!');
+      return;
+    }
+
+    setReviewTags([...reviewTags, { star: availableStar, tags: [] }]);
+    setRtInput([...rtInput, '']);
+    setIsDirty(true);
+  };
+
+  const removeReviewRule = (index: number) => {
+    setReviewTags(reviewTags.filter((_, i) => i !== index));
+    setRtInput(rtInput.filter((_, i) => i !== index));
+    setIsDirty(true);
+  };
+
+  const updateReviewRule = (index: number, value: number) => {
+    const newRules = [...reviewTags];
+    newRules[index].star = value;
+    setReviewTags(newRules);
+    setIsDirty(true);
+  };
+
+  const addReviewTagToRule = (ruleIdx: number, value: string) => {
+    if (!value.trim()) return;
+    const newRules = [...reviewTags];
+    if (!newRules[ruleIdx].tags.includes(value.trim())) {
+      newRules[ruleIdx].tags = [...newRules[ruleIdx].tags, value.trim()];
+      setReviewTags(newRules);
+      setIsDirty(true);
+    }
+    const newInputs = [...rtInput];
+    newInputs[ruleIdx] = '';
+    setRtInput(newInputs);
+  };
+
+  const removeReviewTagFromRule = (ruleIdx: number, tagIdx: number) => {
+    const newRules = [...reviewTags];
+    newRules[ruleIdx].tags = newRules[ruleIdx].tags.filter((_, i) => i !== tagIdx);
+    setReviewTags(newRules);
     setIsDirty(true);
   };
 
@@ -409,6 +538,105 @@ export default function RecipeEditor() {
                   ))}
                 </div>
               </section>
+
+              {/* Review Tags Rules */}
+              <section className="bg-card p-8 rounded-3xl border border-border shadow-sm mt-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-lg font-bold text-foreground">Gợi ý đánh giá nhanh</h2>
+                    <p className="text-[13px] text-muted-foreground mt-1">Thiết lập các thẻ từ khóa gợi ý cho bé dựa trên số sao đánh giá</p>
+                  </div>
+                  <button 
+                    onClick={addReviewRule}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary font-bold rounded-xl hover:bg-primary/20 transition-all text-xs"
+                  >
+                    <Plus size={16} />
+                    Thêm luật
+                  </button>
+                </div>
+
+                <div className="space-y-8">
+                  {(!Array.isArray(reviewTags) || reviewTags.length === 0) ? (
+                    <div className="text-center py-12 border-2 border-dashed border-border rounded-2xl bg-secondary/30">
+                      <Star size={32} className="mx-auto text-muted-foreground/30 mb-3" />
+                      <p className="text-sm font-medium text-muted-foreground">Chưa có gợi ý nào</p>
+                      <button onClick={addReviewRule} className="text-primary font-black uppercase tracking-widest text-[10px] mt-2">Thêm ngay</button>
+                    </div>
+                  ) : (
+                    reviewTags.map((rule, idx) => (
+                      <div key={idx} className="p-6 bg-secondary border border-border rounded-[24px] space-y-5 relative group/rule">
+                        <button 
+                          onClick={() => removeReviewRule(idx)}
+                          className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-destructive text-destructive-foreground shadow-lg flex items-center justify-center opacity-0 group-hover/rule:opacity-100 transition-opacity z-10"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-[13px] font-bold text-muted-foreground">Khi chọn</span>
+                            <select 
+                              value={rule.star}
+                              onChange={e => updateReviewRule(idx, parseInt(e.target.value))}
+                              className="bg-card border border-border rounded-lg px-2 py-1.5 text-sm font-bold text-foreground outline-none focus:border-primary min-w-[100px]"
+                            >
+                              {[5, 4, 3, 2, 1].map(s => {
+                                const isUsed = reviewTags.some((r, i) => r.star === s && i !== idx);
+                                return (
+                                  <option key={s} value={s} disabled={isUsed}>
+                                    {s} sao {isUsed ? '(Đã có)' : ''}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                          
+                          <div className="flex gap-0.5 ml-auto">
+                            {Array.from({ length: 5 }).map((_, sIdx) => {
+                              const starNum = sIdx + 1;
+                              const isActive = starNum <= rule.star;
+                              return <Star key={sIdx} size={14} className={isActive ? 'fill-amber-400 text-amber-400' : 'text-muted/20'} />;
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap gap-2">
+                            {rule.tags.map((tag, tIdx) => (
+                              <span key={tIdx} className="flex items-center gap-2 bg-card border border-border px-3 py-1.5 rounded-full text-xs font-bold text-foreground shadow-sm group/tag">
+                                {tag}
+                                <button onClick={() => removeReviewTagFromRule(idx, tIdx)} className="text-muted-foreground hover:text-destructive">
+                                  <X size={12} />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                          <div className="relative">
+                            <input 
+                              type="text"
+                              value={rtInput[idx] || ''}
+                              onChange={e => {
+                                const newInputs = [...rtInput];
+                                newInputs[idx] = e.target.value;
+                                setRtInput(newInputs);
+                              }}
+                              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addReviewTagToRule(idx, rtInput[idx]))}
+                              placeholder="Thêm thẻ gợi ý (Nhấn Enter)"
+                              className="w-full px-4 py-2.5 bg-card border border-border rounded-xl text-xs font-bold outline-none focus:border-primary transition-all pr-12"
+                            />
+                            <button 
+                              onClick={() => addReviewTagToRule(idx, rtInput[idx])}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-primary hover:scale-110 transition-transform"
+                            >
+                              <Plus size={20} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
             </div>
 
             <div className="space-y-8">
@@ -455,13 +683,18 @@ export default function RecipeEditor() {
 
               {/* Status & Options */}
               <section className="bg-card p-6 rounded-3xl border border-border shadow-sm space-y-6">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-muted-foreground">Công khai</span>
+                <div className="flex items-center justify-between p-2 bg-secondary rounded-2xl border border-border/50">
+                  <div className="flex flex-col gap-0.5 ml-1">
+                    <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Trạng thái</span>
+                    <span className={`text-sm font-bold ${isPublished ? 'text-green-600' : 'text-amber-600'}`}>
+                      {isPublished ? 'Công khai' : 'Bản nháp'}
+                    </span>
+                  </div>
                   <button 
                     onClick={() => setIsPublished(!isPublished)}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${isPublished ? 'bg-green-500' : 'bg-muted/40'}`}
+                    className={`relative w-14 h-7 rounded-full transition-all duration-300 shadow-inner ${isPublished ? 'bg-green-500 shadow-green-600/20' : 'bg-amber-500 shadow-amber-600/20'}`}
                   >
-                    <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${isPublished ? 'translate-x-6' : ''}`} />
+                    <div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300 transform ${isPublished ? 'translate-x-7' : 'translate-x-0'}`} />
                   </button>
                 </div>
 
@@ -501,7 +734,7 @@ export default function RecipeEditor() {
         isOpen={showLeaveConfirm}
         onClose={() => setShowLeaveConfirm(false)}
         onConfirm={() => navigate('/chef/recipes')}
-        icon="⚠️"
+        icon={<AlertTriangle size={24} className="text-amber-500" />}
         title="Chưa lưu thay đổi?"
         message="Bạn có thay đổi chưa lưu. Bạn có chắc muốn rời trang không?"
         confirmText="Rời khỏi trang"
