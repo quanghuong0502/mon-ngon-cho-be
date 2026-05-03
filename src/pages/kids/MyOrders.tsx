@@ -368,7 +368,7 @@ function ReviewModal({ recipe, orderId, orderDate, orderDay, user, existingRevie
                   className={`transition-colors duration-200 ${
                     star <= (hoverRating || rating) 
                       ? 'text-primary fill-primary' 
-                      : 'text-[#FED7AA] fill-none'
+                      : 'text-border fill-muted/20'
                   }`}
                   strokeWidth={star <= (hoverRating || rating) ? 2 : 1.5}
                 />

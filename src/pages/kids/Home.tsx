@@ -260,7 +260,12 @@ export default function KidsHome() {
     setLoading(true);
 
     // 1. Listen for News
-    const newsQuery = query(collection(db, 'news'), orderBy('createdAt', 'desc'), limit(10));
+    const newsQuery = query(
+      collection(db, 'news'), 
+      where('isPublished', '==', true),
+      orderBy('createdAt', 'desc'), 
+      limit(10)
+    );
     const unsubscribeNews = onSnapshot(newsQuery, (snap) => {
       const newsItems = snap.docs.map(d => ({ id: d.id, ...d.data() } as News));
       

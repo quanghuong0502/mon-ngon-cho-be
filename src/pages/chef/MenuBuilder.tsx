@@ -33,7 +33,8 @@ import {
   GripVertical,
   Star,
   Utensils,
-  Heart
+  Heart,
+  ChefHat
 } from 'lucide-react';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isBefore, startOfDay } from 'date-fns';
 import { getOptimizedUrl } from '../../lib/cloudinary';
@@ -220,23 +221,15 @@ export default function MenuBuilder() {
   return (
     <div className="chef-page-content h-full overflow-y-auto scrollbar-hide">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-background pb-6">
-        <div className="space-y-[2px]">
-          <h1 className="text-[20px] font-semibold text-foreground">Thực đơn tuần</h1>
-          <p className="text-[13px] font-normal text-muted-foreground">Thiết lập thực đơn dinh dưỡng cho trẻ</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-background pb-6 border-b border-border/50 mb-6 px-1">
+        <div className="space-y-[4px]">
+          <h1 className="text-[22px] md:text-[24px] font-bold text-foreground tracking-tight">Thực đơn của bếp</h1>
+          <p className="text-[13px] font-medium text-muted-foreground/80">Thiết lập dinh dưỡng cân bằng mỗi ngày cho các con</p>
         </div>
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => openSelectionModal(null)}
-            className="flex items-center gap-2 bg-card text-muted-foreground font-bold px-4 py-2 rounded-2xl border border-border hover:bg-secondary transition-all text-sm shadow-sm hover:text-foreground"
-          >
-            <ListPlus size={18} className="text-primary" />
-            Thiết lập nhanh
-          </button>
-
-          <div className="flex items-center bg-card border border-border rounded-2xl overflow-hidden shadow-sm relative">
-            <button onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))} className="p-3 hover:bg-secondary text-muted-foreground"><ChevronLeft size={20} /></button>
-            <div className="relative group cursor-pointer border-x border-border min-w-[140px]">
+        <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
+          <div className="flex items-center bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm relative w-full md:w-auto p-1">
+            <button onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))} className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground transition-colors"><ChevronLeft size={20} /></button>
+            <div className="relative group cursor-pointer flex-1 md:flex-none md:min-w-[160px] text-center">
               <input 
                 type="date" 
                 id="week-picker"
@@ -247,33 +240,44 @@ export default function MenuBuilder() {
                   }
                 }}
               />
-              <div className="px-4 py-2 flex items-center justify-center gap-2 group-hover:bg-secondary transition-colors h-full w-full">
-                <Calendar size={16} className="text-primary shrink-0" />
-                <span className="font-bold text-foreground text-sm whitespace-nowrap">
-                  {format(currentWeek, 'dd/MM')} - {format(addDays(currentWeek, 6), 'dd/MM')}
+              <div className="px-3 py-2 flex items-center justify-center gap-2 group-hover:bg-secondary transition-colors h-full w-full rounded-xl">
+                <Calendar size={15} className="text-primary shrink-0" />
+                <span className="font-bold text-foreground text-[13px] whitespace-nowrap">
+                  {format(currentWeek, 'dd/MM')} – {format(addDays(currentWeek, 6), 'dd/MM')}
                 </span>
               </div>
             </div>
-            <button onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))} className="p-3 hover:bg-secondary text-muted-foreground"><ChevronRight size={20} /></button>
+            <button onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))} className="p-2.5 hover:bg-secondary rounded-xl text-muted-foreground transition-colors"><ChevronRight size={20} /></button>
           </div>
-          <button 
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 bg-primary text-primary-foreground font-bold px-6 py-3 rounded-2xl shadow-lg shadow-primary-shadow/30 hover:opacity-90 transition-all disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="animate-spin" size={20} /> : success ? <CheckCircle2 size={20} /> : <Save size={20} />}
-            {success ? 'Đã lưu' : 'Lưu Thực đơn'}
-          </button>
+
+          <div className="flex gap-2 w-full md:w-auto">
+            <button 
+              onClick={() => openSelectionModal(null)}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-card text-foreground font-bold px-4 py-3 rounded-2xl border border-border/60 hover:bg-secondary transition-all text-[13px] shadow-sm"
+            >
+              <ListPlus size={18} className="text-primary" />
+              Thiết lập nhanh
+            </button>
+
+            <button 
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold px-6 py-3 rounded-2xl shadow-[0_8px_20px_rgba(var(--primary-rgb),0.25)] hover:shadow-none hover:translate-y-[1px] transition-all disabled:opacity-50 text-[13px] whitespace-nowrap"
+            >
+              {saving ? <Loader2 className="animate-spin" size={18} /> : success ? <CheckCircle2 size={18} /> : <Save size={18} />}
+              {success ? 'Đã lưu' : 'Lưu thực đơn'}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Grid */}
-      <div className="mt-6">
+      <div className="relative">
         <div 
-          className="flex-1 grid gap-4 pb-6 scrollbar-hide relative min-h-[500px]"
+          className="grid gap-6 pb-12 overflow-x-auto no-scrollbar scroll-smooth"
           style={{ 
             gridTemplateColumns: activeDays.length > 0 
-              ? `repeat(${activeDays.length}, minmax(200px, 1fr))` 
+              ? `repeat(${activeDays.length}, minmax(280px, 1fr))` 
               : 'repeat(5, 1fr)' 
           }}
         >
@@ -293,99 +297,95 @@ export default function MenuBuilder() {
             )}
           </AnimatePresence>
           {activeDays.map((day) => {
-            // Find index in ALL_DAYS to calculate date correctly
             const idx = ALL_DAYS.findIndex(d => d.key === day.key);
             const dayDate = addDays(currentWeek, idx);
             const isDayPast = isBefore(dayDate, startOfDay(new Date()));
             
             return (
-              <div key={day.key} className={`flex flex-col gap-3 group ${isDayPast ? 'opacity-70' : ''}`}>
-                <div className="flex items-center justify-between px-2">
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${isDayPast ? 'text-muted-foreground/30' : 'text-muted-foreground'}`}>
-                    {day.label} {isDayPast && '(Đã qua)'} {menuData[day.key].length > 0 && <span className={isDayPast ? 'text-muted-foreground/30' : 'text-primary/60'}>· {menuData[day.key].length} món</span>}
-                  </span>
+              <div key={day.key} className="flex flex-col gap-4">
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex flex-col">
+                    <span className={`text-[11px] font-black uppercase tracking-[0.1em] ${isDayPast ? 'text-muted-foreground/40' : 'text-primary'}`}>
+                      {day.label}
+                    </span>
+                    <span className={`text-[12px] font-medium ${isDayPast ? 'text-muted-foreground/40' : 'text-muted-foreground'}`}>
+                      {format(dayDate, 'dd/MM')}
+                      {isDayPast && ' (Đã qua)'}
+                    </span>
+                  </div>
                   {menuData[day.key].length > 0 && !isDayPast && (
                     <button 
                       onClick={() => clearDay(day.key)}
-                      className="text-muted-foreground/30 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                      className="p-1.5 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={16} />
                     </button>
                   )}
                 </div>
                 
                 <div 
-                  className={`min-h-[200px] rounded-[32px] border-2 border-dashed transition-all p-3 flex flex-col gap-2 overflow-hidden ${
+                  className={`min-h-[400px] rounded-[32px] border-2 transition-all p-4 flex flex-col gap-3 relative shadow-sm ${
                     isDayPast
-                    ? 'bg-secondary/30 border-border cursor-not-allowed'
+                    ? 'bg-secondary/20 border-border/40 cursor-not-allowed grayscale-[0.8]'
                     : menuData[day.key].length > 0 
-                      ? 'bg-card border-border hover:border-primary/30' 
-                      : 'bg-secondary/50 border-border hover:bg-primary/5 hover:border-primary/20 cursor-pointer'
+                      ? 'bg-card border-border border-dashed hover:border-primary/20 hover:shadow-md' 
+                      : 'bg-secondary/40 border-dashed border-border/60 hover:bg-primary/[0.02] hover:border-primary/20 cursor-pointer'
                   }`}
                   onClick={() => !isDayPast && menuData[day.key].length === 0 && openSelectionModal(day.key)}
                 >
                   {menuData[day.key].length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30 gap-2">
-                      {!isDayPast && (
-                        <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                          <Plus size={16} />
-                        </div>
-                      )}
-                      <span className="text-[10px] font-bold">{isDayPast ? 'Nghỉ' : 'Chưa có món'}</span>
+                    <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground/30 gap-3">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 border-dashed ${isDayPast ? 'border-border/30' : 'border-border/60 bg-background shadow-inner'}`}>
+                        <Plus size={20} className={isDayPast ? 'opacity-20' : 'text-primary/40'} />
+                      </div>
+                      <span className="text-[12px] font-bold tracking-tight">{isDayPast ? 'Không phục vụ' : 'Bấm để thêm món'}</span>
                     </div>
                   ) : (
                     <>
-                      <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-1">
-                        {menuData[day.key].map((recipe, idx) => (
-                          <div 
-                            key={`${day.key}-${recipe.id}-${idx}`} 
-                            className={`group/item h-[72px] bg-card p-[10px_12px] rounded-2xl border border-border flex items-center gap-3 transition-all ${!isDayPast ? 'hover:border-primary/50 hover:bg-primary/5' : ''}`}
+                      <div className="flex-1 space-y-3 overflow-y-auto no-scrollbar pr-0.5">
+                        {menuData[day.key].map((recipe, rIdx) => (
+                          <motion.div 
+                            layout
+                            key={`${day.key}-${recipe.id}-${rIdx}`} 
+                            className={`group h-[100px] bg-card p-3 rounded-[24px] border border-border shadow-sm flex items-center gap-3 relative ${!isDayPast ? 'hover:border-primary/40 hover:shadow-md' : 'opacity-60'}`}
                           >
-                            <div className="w-12 h-12 rounded-lg bg-secondary overflow-hidden shrink-0 border border-border">
+                            <div className="w-[76px] h-[76px] rounded-2xl bg-secondary overflow-hidden shrink-0 border border-border/50">
                               {recipe.imageUrl ? (
                                 <img src={getOptimizedUrl(recipe.imageUrl, 200)} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
-                                  <Utensils size={18} />
+                                <div className="w-full h-full flex items-center justify-center text-muted-foreground/20">
+                                  <ChefHat size={24} />
                                 </div>
                               )}
                             </div>
                             
-                            <div className="flex-1 min-w-0">
-                              <h4 className="text-[13px] font-medium text-foreground truncate leading-tight mb-0.5">{recipe.title}</h4>
-                              <div className="flex items-center gap-1">
-                                <div className="flex items-center">
-                                  {[1, 2, 3, 4, 5].map(star => (
-                                    <Star key={star} size={8} className={`${star <= (recipe.avgRating || 5) ? 'text-orange-400 fill-orange-400' : 'text-muted-foreground/20 fill-muted-foreground/20'}`} />
-                                  ))}
+                            <div className="flex-1 min-w-0 pr-6">
+                              <h4 className="text-[14px] font-bold text-foreground line-clamp-2 leading-tight mb-1 group-hover:text-primary transition-colors">{recipe.title}</h4>
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <Star size={12} className="text-orange-400 fill-orange-400" />
+                                  <span className="text-[11px] font-bold text-foreground/80">{(recipe.avgRating || 0).toFixed(1)}</span>
                                 </div>
-                                <span className="text-[10px] font-black text-orange-400 mt-0.5">{(recipe.avgRating || 0).toFixed(1)}</span>
-                                {recipe.favoriteCount !== undefined && (
-                                  <div className="flex items-center gap-0.5 text-destructive ml-2">
-                                    <Heart size={8} fill="currentColor" />
-                                    <span className="text-[10px] font-black">{recipe.favoriteCount}</span>
-                                  </div>
-                                )}
+                                <div className="w-[1px] h-2.5 bg-border/60" />
+                                <div className="flex items-center gap-1 text-rose-500">
+                                  <Heart size={10} fill="currentColor" />
+                                  <span className="text-[11px] font-bold">{recipe.favoriteCount || 0}</span>
+                                </div>
                               </div>
                             </div>
     
                             {!isDayPast && (
-                              <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                                <div className="p-1 text-muted-foreground/30 cursor-grab active:cursor-grabbing">
-                                  <GripVertical size={16} />
-                                </div>
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeRecipe(day.key, recipe.id!);
-                                  }}
-                                  className="p-1 text-muted-foreground/30 hover:text-destructive transition-colors"
-                                >
-                                  <X size={16} />
-                                </button>
-                              </div>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeRecipe(day.key, recipe.id!);
+                                }}
+                                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-secondary/50 text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100"
+                              >
+                                <X size={14} />
+                              </button>
                             )}
-                          </div>
+                          </motion.div>
                         ))}
                       </div>
                       {!isDayPast && (
@@ -394,9 +394,9 @@ export default function MenuBuilder() {
                             e.stopPropagation();
                             openSelectionModal(day.key);
                           }}
-                          className="mt-1 w-full py-2 flex items-center justify-center text-muted-foreground/30 hover:text-primary hover:bg-primary/5 rounded-xl transition-all border border-dashed border-border hover:border-primary/50"
+                          className="mt-2 w-full py-3 flex items-center justify-center text-muted-foreground/40 hover:text-primary bg-secondary/20 hover:bg-primary/5 rounded-2xl transition-all border border-dashed border-border/60 hover:border-primary/30 group"
                         >
-                          <Plus size={16} />
+                          <Plus size={18} className="group-hover:scale-110 transition-transform" />
                         </button>
                       )}
                     </>
@@ -417,7 +417,7 @@ export default function MenuBuilder() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -425,168 +425,184 @@ export default function MenuBuilder() {
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               className="relative w-[860px] h-[560px] bg-card rounded-[40px] shadow-2xl flex flex-col overflow-hidden"
             >
-              <div className="h-[64px] px-8 border-b border-border flex items-center justify-between shrink-0">
+              <div className="h-[72px] px-8 border-b border-border flex items-center justify-between shrink-0 bg-background/50 backdrop-blur-md">
                 <div>
-                  <h2 className="text-xl font-bold text-foreground">
+                  <h2 className="text-xl font-black text-foreground tracking-tight">
                     {targetDay ? `Thực đơn ${ALL_DAYS.find(d => d.key === targetDay)?.label}` : 'Thiết lập nhanh'}
                   </h2>
                 </div>
                 <button 
                   onClick={() => setIsModalOpen(false)}
-                  className="modal-close-btn text-muted-foreground hover:text-foreground"
+                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-all"
                   aria-label="Close"
                 >
-                  <X size={20} />
+                  <X size={24} />
                 </button>
               </div>
 
-              {/* Search Bar - Fixed height ~52px */}
-              <div className="h-[52px] px-8 border-b border-border/50 flex items-center shrink-0">
-                <div className="relative w-full max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50" size={16} />
+              {/* Search Bar */}
+              <div className="px-8 py-4 border-b border-border/50 flex flex-col md:flex-row md:items-center gap-4 shrink-0 bg-background/30">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/50" size={18} />
                   <input 
                     type="text" 
-                    placeholder="Tìm kiếm món ăn..." 
+                    placeholder="Tìm kiếm món ăn ngon cho bé..." 
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-1.5 bg-secondary border border-border rounded-xl focus:border-primary outline-none transition-all text-sm text-foreground"
+                    className="w-full pl-11 pr-4 py-3 bg-secondary border-none rounded-2xl focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm text-foreground font-medium"
                   />
                 </div>
+                {!targetDay && (
+                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 md:pb-0">
+                      {activeDays.map((day) => {
+                        const idx = ALL_DAYS.findIndex(d => d.key === day.key);
+                        const dayDate = addDays(currentWeek, idx);
+                        const isDayPast = isBefore(dayDate, startOfDay(new Date()));
+                        if (isDayPast) return null;
+                        
+                        return (
+                          <button
+                            key={day.key}
+                            onClick={() => setBulkDays(prev => 
+                              prev.includes(day.key) ? prev.filter(k => k !== day.key) : [...prev, day.key]
+                            )}
+                            className={`px-4 py-2 rounded-full text-[11px] font-bold whitespace-nowrap transition-all border ${
+                              bulkDays.includes(day.key) 
+                                ? 'bg-primary text-primary-foreground border-primary shadow-sm' 
+                                : 'bg-card border-border text-muted-foreground hover:border-primary/40'
+                            }`}
+                          >
+                            {day.label}
+                          </button>
+                        );
+                      })}
+                   </div>
+                )}
               </div>
 
               <div className="flex-1 flex overflow-hidden">
                 {/* Left: Recipe List */}
-                <div className="flex-1 overflow-y-auto p-[12px] custom-scrollbar">
-                  <div className="grid gap-[12px]" style={{ gridTemplateColumns: 'repeat(auto-fill, 160px)' }}>
+                <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-secondary/10">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {recipes.filter(r => r.title.toLowerCase().includes(searchTerm.toLowerCase())).map(recipe => {
                       const isSelected = tempSelected.some(r => r.id === recipe.id);
                       return (
-                        <div 
+                        <motion.div 
+                          layout
                           key={recipe.id}
                           onClick={() => toggleRecipe(recipe)}
-                          className={`w-[160px] h-[220px] flex-shrink-0 group relative p-2 rounded-2xl border-2 transition-all cursor-pointer flex flex-col ${
-                            isSelected ? 'bg-primary/5 border-primary shadow-md' : 'bg-card border-border hover:border-primary/50'
+                          className={`group relative p-3 rounded-[32px] border-2 transition-all cursor-pointer flex flex-col ${
+                            isSelected ? 'bg-primary/5 border-primary shadow-lg shadow-primary-shadow/10' : 'bg-card border-border hover:border-primary/50 hover:shadow-md'
                           }`}
                         >
-                          <div className="w-[140px] h-[140px] mx-auto rounded-xl bg-secondary overflow-hidden mb-2 relative shrink-0">
+                          <div className="aspect-square rounded-2xl bg-secondary overflow-hidden mb-3 relative shrink-0 border border-border/50">
                             {recipe.imageUrl ? (
-                              <img src={getOptimizedUrl(recipe.imageUrl, 300)} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              <img src={getOptimizedUrl(recipe.imageUrl, 400)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
-                                <Search size={24} />
+                              <div className="w-full h-full flex items-center justify-center text-muted-foreground/20">
+                                <ChefHat size={32} />
                               </div>
                             )}
                             {isSelected && (
                               <div className="absolute inset-0 bg-primary/20 flex items-center justify-center backdrop-blur-[1px]">
-                                <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
-                                  <Check size={20} strokeWidth={3} />
-                                </div>
+                                <motion.div 
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg"
+                                >
+                                  <Check size={24} strokeWidth={4} />
+                                </motion.div>
                               </div>
                             )}
                           </div>
-                          <div className="px-1 flex-1 min-h-0 flex flex-col justify-between">
-                            <p className="text-[13px] font-bold text-foreground line-clamp-2 leading-tight h-[32px] overflow-hidden">
+                          <div className="px-1 flex-1 flex flex-col">
+                            <p className="text-[14px] font-bold text-foreground line-clamp-2 leading-tight mb-2 group-hover:text-primary transition-colors">
                               {recipe.title}
                             </p>
-                            <p className="text-[10px] text-muted-foreground mt-1 uppercase font-black tracking-tighter truncate">
-                              {recipe.category}
-                            </p>
-                            {recipe.favoriteCount !== undefined && (
-                              <div className="flex items-center gap-1 text-destructive mt-1">
-                                <Heart size={10} fill="currentColor" />
-                                <span className="text-[10px] font-bold">{recipe.favoriteCount}</span>
+                            <div className="mt-auto flex items-center justify-between">
+                              <div className="flex items-center gap-1">
+                                <Star size={10} className="text-orange-400 fill-orange-400" />
+                                <span className="text-[10px] font-bold text-muted-foreground">{(recipe.avgRating || 0).toFixed(1)}</span>
                               </div>
-                            )}
+                              <div className="flex items-center gap-1 text-rose-500">
+                                <Heart size={10} fill="currentColor" />
+                                <span className="text-[10px] font-bold">{recipe.favoriteCount || 0}</span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        </motion.div>
                       );
                     })}
                   </div>
                 </div>
 
                 {/* Divider */}
-                <div className="w-px h-full bg-border shrink-0" />
+                <div className="w-px h-full bg-border shrink-0 hidden md:block" />
 
-                {/* Right: Summary & Day Selection */}
-                <div className="w-[280px] bg-secondary/30 flex flex-col shrink-0 overflow-hidden">
-                  <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
-                    {!targetDay && (
-                      <div className="mb-6 shrink-0">
-                        <h3 className="font-bold text-foreground text-xs mb-3 flex items-center gap-2 uppercase tracking-widest opacity-70">
-                          <LayoutGrid size={14} className="text-primary" />
-                          Áp dụng cho
-                        </h3>
-                        <div className="grid grid-cols-1 gap-1.5">
-                          {activeDays.map((day) => {
-                            const idx = ALL_DAYS.findIndex(d => d.key === day.key);
-                            const dayDate = addDays(currentWeek, idx);
-                            const isDayPast = isBefore(dayDate, startOfDay(new Date()));
-                            
-                            return (
-                              <button
-                                key={day.key}
-                                disabled={isDayPast}
-                                onClick={() => setBulkDays(prev => 
-                                  prev.includes(day.key) ? prev.filter(k => k !== day.key) : [...prev, day.key]
-                                )}
-                                className={`flex items-center justify-between p-2.5 rounded-xl border-2 font-bold text-[11px] transition-all ${
-                                  isDayPast
-                                    ? 'bg-secondary/50 border-transparent text-muted-foreground/30 cursor-not-allowed'
-                                    : bulkDays.includes(day.key) 
-                                      ? 'bg-primary/5 border-primary text-primary' 
-                                      : 'bg-card border-border text-muted-foreground hover:border-primary/50 shadow-sm'
-                                }`}
-                              >
-                                {day.label}
-                                {bulkDays.includes(day.key) && <Check size={12} />}
-                              </button>
-                            );
-                          })}
-                        </div>
+                {/* Right: Summary */}
+                <div className="w-[320px] bg-card flex flex-col shrink-0 border-l border-border/50 hidden lg:flex">
+                  <div className="p-6 border-b border-border/50">
+                    <h3 className="font-black text-foreground text-[10px] uppercase tracking-widest flex items-center gap-2 text-primary">
+                      <CheckCircle2 size={16} />
+                      Đã chọn ({tempSelected.length})
+                    </h3>
+                  </div>
+                  <div className="flex-1 p-6 overflow-y-auto custom-scrollbar space-y-3">
+                    {tempSelected.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
+                        <Utensils size={40} className="mb-4" />
+                        <p className="text-xs font-bold leading-relaxed px-4">Hãy chọn món để thêm vào thực đơn nhé!</p>
                       </div>
-                    )}
-
-                    <div className="flex items-center justify-between mb-3 shrink-0">
-                      <h3 className="font-bold text-foreground text-xs flex items-center gap-2 uppercase tracking-widest opacity-70">
-                        <CheckCircle2 size={14} className="text-primary" />
-                        Món đã chọn
-                      </h3>
-                    </div>
-
-                    <div className="space-y-2">
-                      {tempSelected.length === 0 ? (
-                        <div className="bg-card border border-dashed border-border rounded-2xl p-6 text-center shadow-sm">
-                          <p className="text-muted-foreground/50 text-[11px] italic">Chưa có món nào</p>
-                        </div>
-                      ) : (
-                        tempSelected.map(recipe => (
-                          <div key={recipe.id} className="bg-card p-2.5 rounded-xl border border-border shadow-sm flex items-center gap-2 group/sel transition-all hover:border-primary/50">
-                            <div className="w-8 h-8 rounded-lg bg-secondary overflow-hidden shrink-0">
-                              {recipe.imageUrl && <img src={getOptimizedUrl(recipe.imageUrl, 100)} className="w-full h-full object-cover" />}
-                            </div>
-                            <span className="text-[11px] font-bold text-foreground truncate flex-1 min-w-0">{recipe.title}</span>
-                            <button 
-                              onClick={() => toggleRecipe(recipe)}
-                              className="w-6 h-6 rounded-lg bg-secondary text-muted-foreground/30 hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-all"
-                            >
-                              <X size={12} />
-                            </button>
+                    ) : (
+                      tempSelected.map(recipe => (
+                        <motion.div 
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          key={recipe.id} 
+                          className="bg-secondary/30 p-3 rounded-2xl border border-border/50 flex items-center gap-3 group/sel"
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-secondary overflow-hidden shrink-0">
+                            {recipe.imageUrl && <img src={getOptimizedUrl(recipe.imageUrl, 100)} className="w-full h-full object-cover" />}
                           </div>
-                        ))
-                      )}
-                    </div>
+                          <span className="text-[12px] font-bold text-foreground truncate flex-1 min-w-0">{recipe.title}</span>
+                          <button 
+                            onClick={() => toggleRecipe(recipe)}
+                            className="p-1.5 text-muted-foreground/30 hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
+                          >
+                            <X size={14} />
+                          </button>
+                        </motion.div>
+                      ))
+                    )}
                   </div>
 
-                  <div className="p-4 bg-card border-t border-border shrink-0">
+                  <div className="p-6 bg-secondary/10 border-t border-border/50">
                     <button 
                       onClick={applySelection}
                       disabled={tempSelected.length === 0 || (!targetDay && bulkDays.length === 0)}
-                      className="w-full bg-primary text-primary-foreground font-bold py-3.5 rounded-2xl shadow-lg shadow-primary-shadow/30 hover:opacity-90 transition-all disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2 text-sm"
+                      className="w-full bg-primary text-primary-foreground font-bold py-4 rounded-[20px] shadow-lg shadow-primary-shadow/20 hover:shadow-none hover:translate-y-[1px] transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-[15px]"
                     >
-                      Xác nhận
+                      Áp dụng {tempSelected.length} món
                     </button>
                   </div>
                 </div>
+              </div>
+
+              {/* Mobile Footer for Modal */}
+              <div className="lg:hidden p-4 bg-background border-t border-border shrink-0 flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="text-[13px] font-bold text-foreground">Đã chọn {tempSelected.length} món</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {!targetDay ? `Áp dụng cho ${bulkDays.length} ngày` : `Cho ${ALL_DAYS.find(d => d.key === targetDay)?.label}`}
+                  </p>
+                </div>
+                <button 
+                  onClick={applySelection}
+                  disabled={tempSelected.length === 0 || (!targetDay && bulkDays.length === 0)}
+                  className="bg-primary text-primary-foreground font-bold px-6 py-3 rounded-xl shadow-lg transition-all disabled:opacity-50 text-[14px]"
+                >
+                  Xác nhận
+                </button>
               </div>
             </motion.div>
           </div>

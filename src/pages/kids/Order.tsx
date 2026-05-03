@@ -76,6 +76,36 @@ interface FirestoreErrorInfo {
   }
 }
 
+const statusIcons: Record<string, any> = {
+  pending: <div className="w-2 h-2 rounded-full bg-muted-foreground/50" />,
+  preparing: <Loader2 size={12} className="animate-spin text-primary" />,
+  ready: <CircleCheckBig size={14} className="text-green-500" />,
+  done: <CircleCheckBig size={12} className="text-muted-foreground/30" />,
+  cancelled: <div className="w-2 h-2 rounded-full bg-muted-foreground/20" />
+};
+
+const statusLabels: Record<string, string> = {
+  pending: 'Đang chờ',
+  preparing: 'Đang làm',
+  ready: 'Sẵn sàng!',
+  done: 'Hoàn thành',
+  cancelled: 'Đã huỷ'
+};
+
+const lockMessages: Record<string, string> = {
+  preparing: "Đang làm, không thể thay đổi",
+  ready: "Sẵn sàng rồi, qua lấy nhé!",
+  done: "Hoàn thành"
+};
+
+const statusColors: Record<string, string> = {
+  pending: 'text-muted-foreground bg-secondary',
+  preparing: 'text-primary bg-primary/10',
+  ready: 'text-green-600 bg-green-50',
+  done: 'text-muted-foreground bg-secondary',
+  cancelled: 'text-muted-foreground bg-secondary border-border opacity-60'
+};
+
 const MealCard = memo(({ 
   recipe, 
   isLocked, 
@@ -86,7 +116,8 @@ const MealCard = memo(({
   isMealConfirmed, 
   showCheckmark,
   isDimmed,
-  onInfoClick
+  onInfoClick,
+  variant = 'desktop'
 }: {
   recipe: Recipe;
   isLocked: boolean;
@@ -98,12 +129,60 @@ const MealCard = memo(({
   showCheckmark: boolean;
   isDimmed: boolean;
   onInfoClick: (recipe: Recipe) => void;
+  variant?: 'desktop' | 'mobile';
 }) => {
   const isActive = isEditing ? isMealSelected : isMealConfirmed;
 
+  if (variant === 'mobile') {
+    return (
+      <div className="relative">
+        <motion.div
+          onClick={() => !isLocked && handleSelect(dayKey, recipe.id!)}
+          className={`relative rounded-2xl border-2 transition-all overflow-hidden bg-card ${
+            isActive 
+              ? 'border-primary bg-primary/5' 
+              : 'border-border'
+          } ${isLocked && !isMealConfirmed ? 'opacity-40' : ''}`}
+        >
+          <div className="h-[160px] w-full relative">
+            {recipe.imageUrl ? (
+              <img src={getOptimizedUrl(recipe.imageUrl, 600)} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-secondary flex items-center justify-center text-muted-foreground">
+                <UtensilsCrossed size={32} />
+              </div>
+            )}
+            <div className="absolute top-2.5 right-2.5 z-20">
+              <HeartButton recipeId={recipe.id!} size={32} />
+            </div>
+            {isMealConfirmed && (
+              <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-primary text-primary-foreground px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-lg">
+                <Check size={12} strokeWidth={4} />
+                MÓN ĐÃ CHỌN
+              </div>
+            )}
+          </div>
+          <div className="p-4">
+            <h4 className="font-semibold text-foreground text-[15px] mb-1">{recipe.title}</h4>
+            <div className="flex items-center gap-1 text-primary">
+              {[1, 2, 3, 4, 5].map(star => (
+                <Star key={star} size={10} className={star <= (recipe.avgRating || 5) ? 'fill-primary' : 'fill-muted-foreground/20 text-muted-foreground/20'} />
+              ))}
+              <span className="text-[13px] font-bold ml-1">{recipe.avgRating?.toFixed(1) || '5.0'}</span>
+              <span className="text-muted-foreground/30 mx-1">·</span>
+              <div className="flex items-center gap-1 text-destructive">
+                <Heart size={12} fill="currentColor" />
+                <span className="text-[13px] font-bold">{recipe.favoriteCount || 0}</span>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <motion.div 
-      layout
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       whileHover={!isLocked ? { y: -2 } : {}}
@@ -161,6 +240,7 @@ const MealCard = memo(({
     </motion.div>
   );
 });
+
 
 export default function KidsOrder() {
   const { user } = useAuth();
@@ -391,36 +471,6 @@ export default function KidsOrder() {
     }
   };
 
-  const statusIcons: Record<string, any> = {
-    pending: <div className="w-2 h-2 rounded-full bg-muted-foreground/50" />,
-    preparing: <Loader2 size={12} className="animate-spin text-primary" />,
-    ready: <CircleCheckBig size={14} className="text-green-500" />,
-    done: <CircleCheckBig size={12} className="text-muted-foreground/30" />,
-    cancelled: <div className="w-2 h-2 rounded-full bg-muted-foreground/20" />
-  };
-
-  const statusLabels: Record<string, string> = {
-    pending: 'Đang chờ',
-    preparing: 'Đang làm',
-    ready: 'Sẵn sàng!',
-    done: 'Hoàn thành',
-    cancelled: 'Đã huỷ'
-  };
-
-  const lockMessages: Record<string, string> = {
-    preparing: "Đang làm, không thể thay đổi",
-    ready: "Sẵn sàng rồi, qua lấy nhé!",
-    done: "Hoàn thành"
-  };
-
-  const statusColors: Record<string, string> = {
-    pending: 'text-muted-foreground bg-secondary',
-    preparing: 'text-primary bg-primary/10',
-    ready: 'text-green-600 bg-green-50',
-    done: 'text-muted-foreground bg-secondary',
-    cancelled: 'text-muted-foreground bg-secondary border-border opacity-60'
-  };
-
   const handleCancel = async (day: string) => {
     setCancelModal({ isOpen: true, day });
   };
@@ -502,7 +552,7 @@ export default function KidsOrder() {
           </div>
 
           {/* Sticky Day Tab Bar for Mobile - Sticks below Week Badge */}
-          <div className="sticky top-[76px] z-30 bg-background border-b border-border px-4 pt-4 pb-4 md:hidden overflow-x-auto scrollbar-hide flex justify-center gap-3 no-scrollbar">
+          <div className="sticky top-[60px] z-30 bg-background border-b border-border px-4 pt-4 pb-4 md:hidden overflow-x-auto scrollbar-hide flex justify-center gap-3 no-scrollbar">
             <style dangerouslySetInnerHTML={{ __html: `
               .no-scrollbar::-webkit-scrollbar { display: none; }
               .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -593,54 +643,25 @@ export default function KidsOrder() {
                         
                         const isMealConfirmed = order?.recipeId === recipeId && order.status !== 'cancelled';
                         const isMealSelected = tempSelection === recipeId;
-                        const isCardActive = isEditing ? isMealSelected : isMealConfirmed;
 
                         return (
-                          <div key={recipeId} className="relative">
-                            <motion.div
-                              onClick={() => !isLocked && handleSelect(day.key, recipe.id!)}
-                              className={`relative rounded-2xl border-2 transition-all overflow-hidden bg-card ${
-                                isCardActive 
-                                  ? 'border-primary bg-primary/5' 
-                                  : 'border-border'
-                              } ${isLocked && !isMealConfirmed ? 'opacity-40' : ''}`}
-                            >
-                              <div className="h-[160px] w-full relative">
-                                {recipe.imageUrl ? (
-                                  <img src={getOptimizedUrl(recipe.imageUrl, 600)} className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full bg-secondary flex items-center justify-center text-muted-foreground">
-                                    <UtensilsCrossed size={32} />
-                                  </div>
-                                )}
-                                <div className="absolute top-2.5 right-2.5 z-20">
-                                  <HeartButton recipeId={recipe.id!} size={32} />
-                                </div>
-                                {isMealConfirmed && (
-                                  <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-primary text-primary-foreground px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-lg">
-                                    <Check size={12} strokeWidth={4} />
-                                    MÓN ĐÃ CHỌN
-                                  </div>
-                                )}
-                              </div>
-                              <div className="p-4">
-                                <h4 className="font-semibold text-foreground text-[15px] mb-1">{recipe.title}</h4>
-                                <div className="flex items-center gap-1 text-primary">
-                                  {[1, 2, 3, 4, 5].map(star => (
-                                    <Star key={star} size={10} className={star <= (recipe.avgRating || 5) ? 'fill-primary' : 'fill-muted-foreground/20 text-muted-foreground/20'} />
-                                  ))}
-                                  <span className="text-[13px] font-bold ml-1">{recipe.avgRating?.toFixed(1) || '5.0'}</span>
-                                  <span className="text-muted-foreground/30 mx-1">·</span>
-                                  <div className="flex items-center gap-1 text-destructive">
-                                    <Heart size={12} fill="currentColor" />
-                                    <span className="text-[13px] font-bold">{recipe.favoriteCount || 0}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </motion.div>
-                          </div>
+                          <MealCard
+                            key={recipeId}
+                            recipe={recipe}
+                            isLocked={isLocked}
+                            handleSelect={handleSelect}
+                            dayKey={day.key}
+                            isEditing={isEditing}
+                            isMealSelected={isMealSelected}
+                            isMealConfirmed={isMealConfirmed}
+                            showCheckmark={!isEditing && isMealConfirmed}
+                            isDimmed={isLocked && !isMealConfirmed}
+                            onInfoClick={setSelectedRecipe}
+                            variant="mobile"
+                          />
                         );
                       })}
+
                     </div>
 
                     {/* Action Row for Mobile Pending Order */}

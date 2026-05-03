@@ -27,13 +27,14 @@ const HeartButton: React.FC<HeartButtonProps> = memo(({ recipeId, size = 30 }) =
       }`}
       style={{ width: size, height: size }}
     >
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         <motion.div
           key={fav ? 'filled' : 'outline'}
-          initial={{ scale: 0.8, opacity: 0 }}
+          initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.8, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 400, damping: 10 }}
+          exit={{ scale: 0.5, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 500, damping: 15 }}
+          className="absolute inset-0 flex items-center justify-center"
         >
           {fav ? (
             <Heart size={size * 0.55} className="fill-destructive text-destructive" />

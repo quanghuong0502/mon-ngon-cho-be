@@ -122,97 +122,97 @@ export default function ChefSettings() {
 
   return (
     <div className="chef-page-content h-full overflow-y-auto scrollbar-hide">
-      <div className="mb-8 pt-5 text-center md:text-left">
-        <h1 className="text-3xl font-black text-foreground tracking-tight flex items-center justify-center md:justify-start gap-3">
-          <SettingsIcon size={32} className="text-primary" />
+      <div className="mb-6 md:mb-8 md:pt-5 text-center md:text-left pt-2">
+        <h1 className="text-[20px] md:text-3xl font-black text-foreground tracking-tight flex items-center justify-center md:justify-start gap-2 md:gap-3">
+          <SettingsIcon size={24} className="text-primary md:w-8 md:h-8" />
           Cài đặt bếp
         </h1>
-        <p className="text-muted-foreground font-medium mt-1">Thông tin bếp và giờ phục vụ</p>
+        <p className="text-[12px] md:text-muted-foreground font-medium mt-1">Thông tin bếp và giờ phục vụ</p>
       </div>
 
       <div className="mt-4">
-        <form onSubmit={handleSave} className="max-w-[680px] mx-auto space-y-6 pb-20">
+        <form onSubmit={handleSave} className="max-w-[680px] mx-auto space-y-4 md:space-y-6 pb-20">
           {/* Section 1: Thông tin bếp */}
-          <section className="bg-card p-8 rounded-[32px] border border-border shadow-sm space-y-6">
-            <div className="flex items-center gap-3 text-lg font-bold text-foreground mb-2">
-              <Info size={20} className="text-primary" />
+          <section className="bg-card p-5 md:p-8 rounded-[24px] md:rounded-[32px] border border-border shadow-sm space-y-4 md:space-y-6">
+            <div className="flex items-center gap-2 md:gap-3 text-base md:text-lg font-bold text-foreground mb-2">
+              <Info size={18} className="text-primary md:w-5 md:h-5" />
               Thông tin bếp
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               <div>
-                <label className="block text-xs font-black uppercase text-muted-foreground tracking-widest mb-1.5 ml-1">Tên bếp</label>
+                <label className="block text-[10px] md:text-xs font-black uppercase text-muted-foreground tracking-widest mb-1 md:mb-1.5 ml-1">Tên bếp</label>
                 <input
                   type="text"
                   value={config.name}
                   onChange={(e) => setConfig({ ...config, name: e.target.value })}
                   placeholder="Món ngon cho bé"
-                  className="w-full px-4 py-3 rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
+                  className="w-full px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-black uppercase text-muted-foreground tracking-widest mb-1.5 ml-1">Mô tả đường đi</label>
+                <label className="block text-[10px] md:text-xs font-black uppercase text-muted-foreground tracking-widest mb-1 md:mb-1.5 ml-1">Mô tả đường đi</label>
                 <textarea
                   rows={3}
                   value={config.directions}
                   onChange={(e) => setConfig({ ...config, directions: e.target.value })}
                   placeholder="Ví dụ: Đi vào cổng chính, rẽ trái, phòng số 101..."
-                  className="w-full px-4 py-3 rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium resize-none text-foreground placeholder:text-muted-foreground/50"
+                  className="w-full px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium resize-none text-foreground placeholder:text-muted-foreground/50"
                 />
               </div>
             </div>
           </section>
 
           {/* Section 2: Google Maps */}
-          <section className="bg-card p-8 rounded-[32px] border border-border shadow-sm space-y-6">
-            <div className="flex items-center gap-3 text-lg font-bold text-foreground mb-2">
-              <MapIcon size={20} className="text-primary" />
+          <section className="bg-card p-5 md:p-8 rounded-[24px] md:rounded-[32px] border border-border shadow-sm space-y-4 md:space-y-6">
+            <div className="flex items-center gap-2 md:gap-3 text-base md:text-lg font-bold text-foreground mb-2">
+              <MapIcon size={18} className="text-primary md:w-5 md:h-5" />
               Google Maps
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               <div>
-                <label className="block text-xs font-black uppercase text-muted-foreground tracking-widest mb-1.5 ml-1">Link Google Maps</label>
+                <label className="block text-[10px] md:text-xs font-black uppercase text-muted-foreground tracking-widest mb-1 md:mb-1.5 ml-1">Link Google Maps</label>
                 <input
                   type="text"
                   value={config.mapsShareLink}
                   onChange={(e) => setConfig({ ...config, mapsShareLink: e.target.value })}
                   placeholder="Paste link Google Maps của bếp..."
-                  className="w-full px-4 py-3 rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
+                  className="w-full px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
                 />
               </div>
             </div>
           </section>
 
           {/* Section 3: Giờ phục vụ */}
-          <section className="bg-card p-8 rounded-[32px] border border-border shadow-sm space-y-6">
-            <div className="flex items-center gap-3 text-lg font-bold text-foreground mb-2">
-              <Clock size={20} className="text-primary" />
+          <section className="bg-card p-5 md:p-8 rounded-[24px] md:rounded-[32px] border border-border shadow-sm space-y-4 md:space-y-6">
+            <div className="flex items-center gap-2 md:gap-3 text-base md:text-lg font-bold text-foreground mb-2">
+              <Clock size={18} className="text-primary md:w-5 md:h-5" />
               Giờ phục vụ
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
               <div>
-                <label className="block text-xs font-black uppercase text-muted-foreground tracking-widest mb-1.5 ml-1">Giờ mở</label>
+                <label className="block text-[10px] md:text-xs font-black uppercase text-muted-foreground tracking-widest mb-1 md:mb-1.5 ml-1">Giờ mở</label>
                 <input
                   type="time"
                   value={config.openTime}
                   onChange={(e) => setConfig({ ...config, openTime: e.target.value })}
-                  className="w-full px-4 py-3 rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium text-foreground"
+                  className="w-full px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium text-foreground"
                 />
               </div>
               <div>
-                <label className="block text-xs font-black uppercase text-muted-foreground tracking-widest mb-1.5 ml-1">Giờ đóng</label>
+                <label className="block text-[10px] md:text-xs font-black uppercase text-muted-foreground tracking-widest mb-1 md:mb-1.5 ml-1">Giờ đóng</label>
                 <input
                   type="time"
                   value={config.closeTime}
                   onChange={(e) => setConfig({ ...config, closeTime: e.target.value })}
-                  className="w-full px-4 py-3 rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium text-foreground"
+                  className="w-full px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium text-foreground"
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-black uppercase text-muted-foreground tracking-widest mb-1.5 ml-1">Ngày phục vụ</label>
+                <label className="block text-[10px] md:text-xs font-black uppercase text-muted-foreground tracking-widest mb-1.5 md:mb-2 ml-1">Ngày phục vụ</label>
                 <div className="flex flex-wrap gap-2">
                   {DAYS_MAP.map((day) => {
                     const isSelected = config.servingDays.includes(day.key);
@@ -222,7 +222,7 @@ export default function ChefSettings() {
                         type="button"
                         onClick={() => toggleDay(day.key)}
                         className={`
-                          px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border transition-all
+                          px-3 md:px-4 py-1.5 md:py-2 rounded-[10px] md:rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest border transition-all
                           ${isSelected 
                             ? 'bg-primary border-primary text-primary-foreground shadow-md shadow-primary-shadow/30' 
                             : 'bg-card border-border text-muted-foreground hover:border-primary/50'}
@@ -238,65 +238,65 @@ export default function ChefSettings() {
           </section>
 
           {/* Section 4: Tin nhắn cho bé */}
-          <section className="bg-card p-8 rounded-[32px] border border-border shadow-sm space-y-6">
-            <div className="flex items-center gap-3 text-lg font-bold text-foreground mb-2">
-              <MessageSquare size={20} className="text-primary" />
+          <section className="bg-card p-5 md:p-8 rounded-[24px] md:rounded-[32px] border border-border shadow-sm space-y-4 md:space-y-6">
+            <div className="flex items-center gap-2 md:gap-3 text-base md:text-lg font-bold text-foreground mb-2">
+              <MessageSquare size={18} className="text-primary md:w-5 md:h-5" />
               Tin nhắn cho bé
             </div>
 
             <div>
-              <label className="block text-xs font-black uppercase text-muted-foreground tracking-widest mb-1.5 ml-1">Lời nhắn khi món sẵn sàng</label>
+              <label className="block text-[10px] md:text-xs font-black uppercase text-muted-foreground tracking-widest mb-1 md:mb-1.5 ml-1">Lời nhắn khi sẵn sàng</label>
               <textarea
                 rows={2}
                 value={config.readyMessage}
                 onChange={(e) => setConfig({ ...config, readyMessage: e.target.value })}
-                className="w-full px-4 py-3 rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium resize-none text-foreground placeholder:text-muted-foreground/50"
+                className="w-full px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium resize-none text-foreground placeholder:text-muted-foreground/50"
               />
             </div>
           </section>
 
           {/* Section 5: Giao diện */}
-          <section className="bg-card p-8 rounded-[32px] border border-border shadow-sm space-y-6">
-            <div className="flex items-center gap-3 text-lg font-bold text-foreground mb-2">
-              <Sun size={20} className="text-primary" />
+          <section className="bg-card p-5 md:p-8 rounded-[24px] md:rounded-[32px] border border-border shadow-sm space-y-4 md:space-y-6">
+            <div className="flex items-center gap-2 md:gap-3 text-base md:text-lg font-bold text-foreground mb-2">
+              <Sun size={18} className="text-primary md:w-5 md:h-5" />
               Giao diện ứng dụng
             </div>
 
-            <div className="flex bg-secondary p-1.5 rounded-2xl gap-2">
+            <div className="flex bg-secondary p-1 rounded-xl md:rounded-2xl gap-1 md:gap-2">
               <button
                 type="button"
                 onClick={() => setTheme('light')}
-                className={`flex-1 flex items-center justify-center gap-3 py-3 rounded-xl text-sm font-bold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-1.5 md:gap-3 py-2 md:py-3 rounded-[10px] md:rounded-xl text-[12px] md:text-sm font-bold transition-all ${
                   theme === 'light' 
                     ? 'bg-card text-primary shadow-sm ring-1 ring-border' 
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Sun size={18} />
+                <Sun size={16} className="md:w-4.5 md:h-4.5" />
                 Sáng
               </button>
               <button
                 type="button"
                 onClick={() => setTheme('dark')}
-                className={`flex-1 flex items-center justify-center gap-3 py-3 rounded-xl text-sm font-bold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-1.5 md:gap-3 py-2 md:py-3 rounded-[10px] md:rounded-xl text-[12px] md:text-sm font-bold transition-all ${
                   theme === 'dark' 
                     ? 'bg-card text-primary shadow-sm ring-1 ring-border' 
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Moon size={18} />
+                <Moon size={16} className="md:w-4.5 md:h-4.5" />
                 Tối
               </button>
               <button
                 type="button"
                 onClick={() => setTheme('system')}
-                className={`flex-1 flex items-center justify-center gap-3 py-3 rounded-xl text-sm font-bold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-1.5 md:gap-3 py-2 md:py-3 rounded-[10px] md:rounded-xl text-[12px] md:text-sm font-bold transition-all ${
                   theme === 'system' 
                     ? 'bg-card text-primary shadow-sm ring-1 ring-border' 
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Monitor size={18} />
+                <Monitor size={16} className="md:w-4.5 md:h-4.5" />
                 Hệ thống
               </button>
             </div>
@@ -305,9 +305,9 @@ export default function ChefSettings() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full py-4 bg-primary text-primary-foreground rounded-[24px] font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 shadow-lg shadow-primary-shadow/30 hover:opacity-90 transition-all disabled:opacity-50"
+            className="w-full py-4 bg-primary text-primary-foreground rounded-[20px] md:rounded-[24px] font-black uppercase tracking-widest text-[13px] md:text-sm flex items-center justify-center gap-3 shadow-lg shadow-primary-shadow/30 hover:opacity-90 transition-all disabled:opacity-50"
           >
-            <Save size={20} />
+            <Save size={18} />
             {saving ? 'Đang lưu...' : 'Lưu cài đặt'}
           </button>
         </form>

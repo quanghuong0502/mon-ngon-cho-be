@@ -99,16 +99,17 @@ service cloud.firestore {
 
     // --- News Validation ---
     function isValidNews(data) {
-      return data.keys().hasAll(['title', 'content', 'createdBy', 'createdAt', 'isPinned'])
+      return data.keys().hasAll(['title', 'content', 'createdBy', 'createdAt', 'isPinned', 'isPublished'])
         && data.title is string && data.title.size() > 0 && data.title.size() <= 500
-        && data.content is string && data.content.size() <= 5000
+        && data.content is string && data.content.size() <= 10000
         && data.createdBy is string && isValidId(data.createdBy)
         && data.createdAt is timestamp
-        && data.isPinned is bool;
+        && data.isPinned is bool
+        && data.isPublished is bool;
     }
 
     match /news/{newsId} {
-      allow read: if true;
+      allow read: if resource.data.isPublished == true || (request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'chef');
       allow create, update: if isValidNews(incoming());
       allow delete: if true;
     }

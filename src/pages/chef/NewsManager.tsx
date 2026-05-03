@@ -102,7 +102,8 @@ export default function NewsManager() {
       setEditing({ 
         title: '', 
         content: '', 
-        isPinned: false 
+        isPinned: false,
+        isPublished: true
       });
       setImagePreview('');
     }
@@ -128,37 +129,65 @@ export default function NewsManager() {
         title: editing.title,
         content: editing.content,
         isPinned: !!editing.isPinned,
+        isPublished: !!editing.isPublished,
         imageUrl,
         updatedAt: serverTimestamp(),
       };
 
       if (editing.id) {
+        // Find the old item to check transition
+        const oldItem = news.find(n => n.id === editing.id);
+        const wasDraft = oldItem && !oldItem.isPublished;
+        const isNowPublished = editing.isPublished;
+
         await updateDoc(doc(db, 'news', editing.id), newsData);
+
+        // Notify if transitioning from draft to published
+        if (wasDraft && isNowPublished) {
+          try {
+            const kidIds = await getAllKidOneSignalIds();
+            if (kidIds.length > 0) {
+              const pushBody = editing.title!.length > 100 
+                ? editing.title!.substring(0, 97) + '...' 
+                : editing.title!;
+
+              await sendPushToUser(
+                kidIds,
+                'Tin mới từ Đầu bếp',
+                pushBody,
+                '/kids/home'
+              );
+            }
+          } catch (err) {
+            console.error('Notify kids error:', err);
+          }
+        }
       } else {
         await addDoc(collection(db, 'news'), {
           ...newsData,
           createdAt: serverTimestamp(),
           createdBy: session?.userId,
-          isPublished: true // Default to published for simplicity now
         });
         
-        // Notify all kids
-        try {
-          const kidIds = await getAllKidOneSignalIds();
-          if (kidIds.length > 0) {
-            const pushBody = editing.title!.length > 100 
-              ? editing.title!.substring(0, 97) + '...' 
-              : editing.title!;
+        // Notify all kids if published
+        if (editing.isPublished) {
+          try {
+            const kidIds = await getAllKidOneSignalIds();
+            if (kidIds.length > 0) {
+              const pushBody = editing.title!.length > 100 
+                ? editing.title!.substring(0, 97) + '...' 
+                : editing.title!;
 
-            await sendPushToUser(
-              kidIds,
-              'Tin mới từ Đầu bếp',
-              pushBody,
-              '/kids/home'
-            );
+              await sendPushToUser(
+                kidIds,
+                'Tin mới từ Đầu bếp',
+                pushBody,
+                '/kids/home'
+              );
+            }
+          } catch (err) {
+            console.error('Notify kids error:', err);
           }
-        } catch (err) {
-          console.error('Notify kids error:', err);
         }
       }
       
@@ -192,106 +221,103 @@ export default function NewsManager() {
 
   return (
     <div className="chef-page-content h-full overflow-y-auto scrollbar-hide">
-      <div className="flex items-center justify-between mb-6 bg-background">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-background">
         <div className="space-y-[2px]">
-          <h1 className="text-[20px] font-semibold text-foreground">Quản lý Tin tức</h1>
-          <p className="text-[13px] font-normal text-muted-foreground">Đăng thông báo và cập nhật cho bé</p>
+          <h1 className="text-[18px] md:text-[20px] font-semibold text-foreground">Quản lý Tin tức</h1>
+          <p className="text-[12px] md:text-[13px] font-normal text-muted-foreground">Đăng thông báo và cập nhật cho bé</p>
         </div>
         <button 
           onClick={() => handleEdit()}
-          className="flex items-center gap-2 bg-primary text-primary-foreground font-bold px-6 py-3 rounded-2xl shadow-lg shadow-primary-shadow/30 hover:opacity-90 transition-all"
+          className="flex items-center justify-center gap-2 bg-primary text-primary-foreground font-bold px-5 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl shadow-lg shadow-primary-shadow/30 hover:opacity-90 transition-all text-[13px] md:text-base whitespace-nowrap"
         >
-          <Plus size={20} />
+          <Plus size={18} className="md:w-5 md:h-5" />
           Đăng bài mới
         </button>
       </div>
 
       <div className="mt-4">
         {sortedNews.length === 0 ? (
-          <div className="bg-card rounded-[40px] border border-primary/20 py-20 flex flex-col items-center justify-center text-center">
-            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-6">
-              <ImageIcon size={40} />
+          <div className="bg-card rounded-[32px] md:rounded-[40px] border border-primary/20 py-16 md:py-20 flex flex-col items-center justify-center text-center px-6">
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-6">
+              <Megaphone size={32} className="md:w-10 md:h-10" />
             </div>
-            <h3 className="text-xl font-bold text-foreground mb-2">Chưa có bài viết nào</h3>
-            <p className="text-muted-foreground mb-8 max-w-sm">Bắt đầu truyền thông các hoạt động bếp ăn trường học đến với các bé ngay!</p>
+            <h3 className="text-lg md:text-xl font-bold text-foreground mb-2">Chưa có bài viết nào</h3>
+            <p className="text-[13px] md:text-sm text-muted-foreground mb-8 max-w-sm">Bắt đầu truyền thông tới các bé ngay!</p>
             <button 
               onClick={() => handleEdit()}
-              className="flex items-center gap-2 bg-primary text-primary-foreground font-bold px-8 py-4 rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary-shadow/30"
+              className="flex items-center gap-2 bg-primary text-primary-foreground font-bold px-6 md:px-8 py-3 md:py-4 rounded-xl md:rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-primary-shadow/30 text-sm md:text-base"
             >
-              <Plus size={20} />
-              Đăng bản tin đầu tiên
+              <Plus size={18} />
+              Đăng tin đầu tiên
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 pb-12">
             {sortedNews.map(item => (
               <div 
                 key={item.id} 
                 onClick={() => setSelectedPreviewNews(item)}
-                className="bg-card rounded-[32px] border border-border shadow-sm overflow-hidden group hover:shadow-xl hover:scale-[1.01] transition-all duration-300 flex flex-col cursor-pointer"
+                className="bg-card rounded-[24px] md:rounded-[32px] border border-border shadow-sm overflow-hidden group hover:shadow-xl hover:scale-[1.01] transition-all duration-300 flex flex-col cursor-pointer"
               >
                 {/* Cover Image */}
-                <div className="relative h-40 bg-secondary overflow-hidden shrink-0">
+                <div className="relative h-32 md:h-40 bg-secondary overflow-hidden shrink-0">
                   {item.imageUrl ? (
                     <img src={getOptimizedUrl(item.imageUrl, 600)} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center text-primary/20">
-                      <ImageIcon size={40} />
+                      <ImageIcon size={32} className="md:w-10 md:h-10" />
                     </div>
                   )}
                   
                   {/* Badges */}
-                  {item.isPinned && (
-                    <div className="absolute top-[10px] left-[10px] bg-orange-500 text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 border border-orange-400 z-10">
-                      <Pin size={12} fill="white" className="-rotate-45" />
-                      Ghim
-                    </div>
-                  )}
-                  {!item.isPublished && (
-                    <div className="absolute top-[10px] right-[10px] bg-muted-foreground text-foreground-inverse text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 border border-muted z-10">
-                      Bản nháp
-                    </div>
-                  )}
+                  <div className="absolute top-[10px] left-[10px] flex flex-col gap-2 z-10">
+                    {item.isPinned && (
+                      <div className="bg-orange-500 text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest px-2 md:px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 border border-orange-400">
+                        <Pin size={10} fill="white" className="-rotate-45 md:w-3 md:h-3" />
+                        Ghim
+                      </div>
+                    )}
+                    {!item.isPublished && (
+                      <div className="bg-muted-foreground text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest px-2 md:px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 border border-muted-foreground/50">
+                        Bản nháp
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Body */}
-                <div className="p-5 flex-1 flex flex-col">
-                  <h3 className="text-[15px] font-bold text-foreground mb-2 line-clamp-2 leading-snug transition-colors">
+                <div className="p-4 md:p-5 flex-1 flex flex-col">
+                  <h3 className="text-[14px] md:text-[15px] font-bold text-foreground mb-1.5 md:mb-2 line-clamp-2 leading-snug transition-colors">
                     {item.title}
                   </h3>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-4 leading-relaxed">
-                    {stripHtml(item.content).slice(0, 80)}
-                    {stripHtml(item.content).length > 80 ? '...' : ''}
-                  </p>
-                  
-                  <div className="mt-auto flex items-center justify-between pt-4 border-t border-border">
-                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                  <div className="mt-auto flex items-center justify-between pt-3 md:pt-4 border-t border-border">
+                    <span className="text-[9px] md:text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
                       {item.createdAt ? format(item.createdAt.toDate(), 'dd/MM/yyyy') : '---'}
                     </span>
                     
                     <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                       <button 
                         onClick={(e) => handleTogglePin(item, e)}
-                        className={`p-2 rounded-xl text-[11px] font-bold transition-all flex items-center gap-1.5 ${
+                        className={`p-1.5 md:p-2 rounded-lg md:rounded-xl text-[9px] md:text-[11px] font-bold transition-all flex items-center gap-1 md:gap-1.5 ${
                           item.isPinned 
                             ? 'text-orange-500 bg-orange-500/10 hover:bg-orange-500/20' 
                             : 'text-muted-foreground hover:text-primary hover:bg-primary/5'
                         }`}
                       >
-                        <Pin size={14} fill={item.isPinned ? "currentColor" : "none"} />
-                        {item.isPinned ? 'Bỏ ghim' : 'Ghim'}
+                        <Pin size={12} fill={item.isPinned ? "currentColor" : "none"} className="md:w-3.5 md:h-3.5" />
+                        <span className="hidden xs:inline">{item.isPinned ? 'Bỏ ghim' : 'Ghim'}</span>
                       </button>
                       <button 
                         onClick={(e) => handleEdit(item, e)} 
-                        className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
+                        className="p-1.5 md:p-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg md:rounded-xl transition-all"
                       >
-                        <Edit3 size={16} />
+                        <Edit3 size={14} className="md:w-4 md:h-4" />
                       </button>
                       <button 
                         onClick={(e) => { e.stopPropagation(); setDeleteConfirm(item.id!); }} 
-                        className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all"
+                        className="p-1.5 md:p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg md:rounded-xl transition-all"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={14} className="md:w-4 md:h-4" />
                       </button>
                     </div>
                   </div>
@@ -311,7 +337,7 @@ export default function NewsManager() {
       {/* Editor Modal */}
       <AnimatePresence>
         {editing && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0, y: 50, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -356,6 +382,32 @@ export default function NewsManager() {
                   </div>
 
                   <div className="space-y-6">
+                    <div className="bg-secondary p-6 rounded-3xl border border-border flex items-center justify-between shadow-sm">
+                       <div>
+                          <p className="text-sm font-bold text-foreground">Công khai</p>
+                          <p className="text-xs text-muted-foreground">Bé có thể xem thấy</p>
+                       </div>
+                       <button 
+                        onClick={() => setEditing({...editing, isPublished: !editing.isPublished})}
+                        className={`w-12 h-6 rounded-full relative transition-colors ${editing.isPublished ? 'bg-green-500' : 'bg-muted/40'}`}
+                       >
+                         <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${editing.isPublished ? 'translate-x-6' : ''}`} />
+                       </button>
+                    </div>
+
+                    <div className="bg-secondary p-6 rounded-3xl border border-border flex items-center justify-between shadow-sm">
+                       <div>
+                          <p className="text-sm font-bold text-foreground">Ghim lên đầu</p>
+                          <p className="text-xs text-muted-foreground">Tin này sẽ luôn ở trên cùng</p>
+                       </div>
+                       <button 
+                        onClick={() => setEditing({...editing, isPinned: !editing.isPinned})}
+                        className={`w-12 h-6 rounded-full relative transition-colors ${editing.isPinned ? 'bg-primary' : 'bg-muted/40'}`}
+                       >
+                         <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${editing.isPinned ? 'translate-x-6' : ''}`} />
+                       </button>
+                    </div>
+
                     <div>
                        <label className="block text-sm font-bold text-muted-foreground mb-2">Ảnh bìa</label>
                        <div className="aspect-video bg-secondary border-2 border-dashed border-border rounded-2xl overflow-hidden relative group">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { doc, updateDoc, arrayUnion, arrayRemove, getDoc, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from 'react-hot-toast';
@@ -30,10 +30,16 @@ export const useFavorites = (userId: string | undefined) => {
     fetchFavorites();
   }, [userId]);
 
+  const favoritesRef = useRef(favorites);
+  useEffect(() => {
+    favoritesRef.current = favorites;
+  }, [favorites]);
+
   const toggleFavorite = useCallback(async (recipeId: string) => {
     if (!userId) return;
 
-    const isFav = favorites.includes(recipeId);
+    const currentFavorites = favoritesRef.current;
+    const isFav = currentFavorites.includes(recipeId);
     
     // Optimistic update
     setFavorites(prev => 
@@ -60,10 +66,15 @@ export const useFavorites = (userId: string | undefined) => {
       );
       toast.error('Có lỗi xảy ra, thử lại nhé!');
     }
-  }, [favorites, userId]);
+  }, [userId]);
 
   const isFavorite = useCallback((recipeId: string) => 
     favorites.includes(recipeId), [favorites]);
 
-  return { favorites, toggleFavorite, isFavorite, loaded };
+  return React.useMemo(() => ({ 
+    favorites, 
+    toggleFavorite, 
+    isFavorite, 
+    loaded 
+  }), [favorites, toggleFavorite, isFavorite, loaded]);
 };

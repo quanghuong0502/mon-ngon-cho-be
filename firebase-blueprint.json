@@ -114,7 +114,8 @@
         "imageUrl": { "type": "string" },
         "createdBy": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
-        "isPinned": { "type": "boolean" }
+        "isPinned": { "type": "boolean" },
+        "isPublished": { "type": "boolean" }
       }
     },
     "KitchenConfig": {
@@ -178,6 +179,7 @@
     "news": { "schema": "News", "description": "Announcements" },
     "config/main": { "schema": "KitchenConfig", "description": "Kitchen details" },
     "achievements": { "schema": "Achievement", "description": "Global achievement rules" },
-    "users/{userId}/unlockedAchievements": { "schema": "UnlockedAchievement", "description": "Achievements earned by a specific kid" }
+    "users/{userId}/unlockedAchievements": { "schema": "UnlockedAchievement", "description": "Achievements earned by a specific kid" },
+    "users/{userId}/notifications": { "schema": "object", "description": "In-app notifications for the user" }
   }
 }

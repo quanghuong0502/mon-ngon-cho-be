@@ -77,7 +77,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor;
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen bg-background overflow-hidden font-sans">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border shadow-sm z-0">
         <Link 
@@ -85,7 +85,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           className="p-6 flex items-center space-x-3 mb-4 hover:opacity-80 transition-opacity"
         >
           <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain" />
-          <span className="font-bold text-xl text-foreground tracking-tight">Món ngon cho bé</span>
+          <span className="font-bold text-xl text-foreground tracking-tight">Bữa Cơm Bé Yêu</span>
         </Link>
 
         <nav className="flex-1 px-4 space-y-1">
@@ -102,7 +102,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               }
             >
               <link.icon size={20} />
-              <span>{link.label}</span>
+              <span className="text-[15px]">{link.label}</span>
             </NavLink>
           ))}
         </nav>
@@ -134,17 +134,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col bg-background relative min-w-0 overflow-hidden pb-20 md:pb-0">
+      <main className="flex-1 flex flex-col bg-background relative min-w-0 overflow-hidden pb-[72px] md:pb-0">
         <header className="h-16 px-4 md:px-8 flex items-center justify-between border-b border-border bg-card/50 backdrop-blur-md">
-          <h1 className="text-lg font-semibold text-foreground md:block hidden">
-            {user.role === 'chef' ? 'Chào buổi sáng, Đầu bếp!' : `Chào Em bé ${user.name.split(' ').pop()}!`}
+          <h1 className="text-[18px] font-semibold text-foreground md:block hidden">
+            {user.role === 'chef' ? 'Chào đầu bếp!' : `Chào bé ${user.name.split(' ').pop()}!`}
           </h1>
           <Link 
             to={user.role === 'chef' ? '/chef/dashboard' : '/kids/home'}
             className="md:hidden flex items-center gap-2 text-primary font-bold hover:opacity-80 transition-opacity"
           >
             <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
-            <span>Món ngon cho bé</span>
+            <span className="text-base">Món ngon cho bé</span>
           </Link>
           <div className="flex items-center space-x-2">
             
@@ -185,19 +185,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Mobile Bottom Tab Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border px-2 py-1 flex justify-around items-center z-50">
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border px-1 py-1 flex items-center z-50 h-[68px] shadow-[0_-4px_16px_rgba(0,0,0,0.05)] ${
+        user.role === 'chef' 
+          ? 'overflow-x-auto no-scrollbar justify-start' 
+          : 'justify-around'
+      }`}>
         {links.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}
             className={({ isActive }) =>
-              `flex flex-col items-center gap-1 p-2 min-w-[64px] transition-colors ${
+              `flex flex-col items-center justify-center gap-1 p-1 transition-all h-full ${
+                user.role === 'chef' ? 'min-w-[72px] shrink-0' : 'flex-1 min-w-0'
+              } ${
                 isActive ? 'text-primary' : 'text-muted-foreground'
               }`
             }
           >
-            <link.icon size={20} />
-            <span className="text-[10px] font-medium">{link.label}</span>
+            <link.icon size={user.role === 'chef' ? 20 : 18} />
+            <span className="text-[10px] font-medium text-center truncate w-full px-0.5">
+              {link.label}
+            </span>
           </NavLink>
         ))}
       </nav>

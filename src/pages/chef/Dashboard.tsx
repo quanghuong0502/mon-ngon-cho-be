@@ -299,9 +299,9 @@ export default function ChefDashboard() {
   return (
     <div className="h-full overflow-y-auto scrollbar-hide chef-page-content">
       {/* Page Title */}
-      <div className="pt-8 space-y-[2px] mb-6">
-        <h1 className="text-[20px] font-semibold text-foreground">Tổng quan</h1>
-        <p className="text-[13px] font-normal text-muted-foreground">Thống kê hoạt động của bếp hôm nay</p>
+      <div className="pt-6 md:pt-8 space-y-[2px] mb-6">
+        <h1 className="text-[18px] md:text-[20px] font-semibold text-foreground">Tổng quan</h1>
+        <p className="text-[12px] md:text-[13px] font-normal text-muted-foreground">Thống kê hoạt động của bếp hôm nay</p>
       </div>
 
       <div className="space-y-8">
@@ -364,12 +364,12 @@ export default function ChefDashboard() {
             {/* Active Orders */}
             <section>
               <div className="flex items-center justify-between mb-4 px-2">
-                <h2 className="text-xl font-bold text-foreground">Đơn hàng mới nhất</h2>
+                <h2 className="text-lg md:text-xl font-bold text-foreground">Đơn hàng mới nhất</h2>
                 <button 
                   onClick={() => navigate('/chef/orders')}
-                  className="text-primary text-sm font-semibold flex items-center hover:underline"
+                  className="text-primary text-[13px] md:text-sm font-semibold flex items-center hover:underline"
                 >
-                  Xem tất cả <ChevronRight size={16} />
+                  Xem tất cả <ChevronRight size={14} className="ml-0.5" />
                 </button>
               </div>
               <div className="space-y-4">
@@ -460,12 +460,12 @@ export default function ChefDashboard() {
             {/* Recent Reviews */}
             <section>
               <div className="flex items-center justify-between mb-4 px-2">
-                <h2 className="text-xl font-bold text-foreground">Đánh giá gần đây</h2>
+                <h2 className="text-lg md:text-xl font-bold text-foreground">Đánh giá gần đây</h2>
                 <button 
                   onClick={() => navigate('/chef/reviews')}
-                  className="text-primary text-sm font-semibold flex items-center hover:underline"
+                  className="text-primary text-[13px] md:text-sm font-semibold flex items-center hover:underline"
                 >
-                  Xem tất cả <ChevronRight size={16} />
+                  Xem tất cả <ChevronRight size={14} className="ml-0.5" />
                 </button>
               </div>
               
@@ -551,21 +551,21 @@ export default function ChefDashboard() {
           </div>
 
           {/* Top Favorites Section */}
-          <section className="bg-card p-8 rounded-[40px] border border-border/50 shadow-sm overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-8 opacity-[0.05] text-foreground pointer-events-none">
+          <section className="bg-card p-6 md:p-8 rounded-[32px] md:rounded-[40px] border border-border/50 shadow-sm overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-8 opacity-[0.05] text-foreground pointer-events-none hidden md:block">
               <TrendingUp size={160} />
             </div>
             
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
               <div>
-                <h2 className="text-2xl font-black text-foreground flex items-center gap-2">
-                  Top món được yêu thích <Trophy className="text-amber-500" />
+                <h2 className="text-xl md:text-2xl font-black text-foreground flex items-center gap-2">
+                  Top món yêu thích <Trophy className="text-amber-500" size={20} />
                 </h2>
-                <p className="text-sm text-muted-foreground mt-1">Dựa trên lượt tim của các bé</p>
+                <p className="text-[13px] md:text-sm text-muted-foreground mt-1">Dựa trên lượt tim của các bé</p>
               </div>
               <button 
                 onClick={() => navigate('/chef/recipes')}
-                className="text-xs font-bold text-primary px-4 py-2 bg-primary/5 rounded-full hover:bg-primary/10 transition-colors uppercase tracking-widest"
+                className="w-fit text-[11px] font-bold text-primary px-4 py-2 bg-primary/5 rounded-full hover:bg-primary/10 transition-colors uppercase tracking-widest whitespace-nowrap"
               >
                 Tất cả công thức
               </button>
@@ -640,12 +640,14 @@ export default function ChefDashboard() {
 
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label: string, value: number, color: string }) {
   return (
-    <div className={`p-6 rounded-3xl border ${color} shadow-sm transition-transform hover:scale-[1.02]`}>
-      <div className="flex items-center gap-4">
-        <div className="p-3 bg-card rounded-2xl shadow-sm">{icon}</div>
+    <div className={`p-4 md:p-6 rounded-2xl md:rounded-3xl border ${color} shadow-sm transition-transform hover:scale-[1.02]`}>
+      <div className="flex items-center gap-3 md:gap-4">
+        <div className="p-2.5 md:p-3 bg-card rounded-xl md:rounded-2xl shadow-sm">
+          {React.cloneElement(icon as React.ReactElement, { size: 18, className: (icon as any).props.className })}
+        </div>
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground opacity-60 px-1">{label}</p>
-          <p className="text-3xl font-black text-foreground">{value}</p>
+          <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-muted-foreground opacity-60 px-0.5 md:px-1">{label}</p>
+          <p className="text-2xl md:text-3xl font-black text-foreground">{value}</p>
         </div>
       </div>
     </div>

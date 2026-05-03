@@ -97,12 +97,13 @@ export default function App() {
               duration: 3000,
               style: {
                 borderRadius: '24px',
-                background: '#334155',
-                color: '#fff',
+                background: 'var(--card)',
+                color: 'var(--foreground)',
                 padding: '16px 24px',
                 fontSize: '14px',
                 fontWeight: '600',
                 boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+                border: '1px solid var(--border)',
               },
             }}
           />

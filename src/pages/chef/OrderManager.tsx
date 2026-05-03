@@ -222,16 +222,16 @@ export default function OrderManager() {
       <div className="space-y-4 bg-background pb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-[2px]">
-            <h1 className="text-[20px] font-semibold text-foreground">Quản lý Đơn hàng</h1>
-            <p className="text-[13px] font-normal text-muted-foreground">Theo dõi và cập nhật trạng thái suất ăn theo ngày</p>
+            <h1 className="text-[18px] md:text-[20px] font-semibold text-foreground">Quản lý Đơn hàng</h1>
+            <p className="text-[12px] md:text-[13px] font-normal text-muted-foreground">Theo dõi và cập nhật trạng thái suất ăn theo ngày</p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="bg-card p-1 rounded-xl border border-border flex gap-1 flex-wrap">
+            <div className="bg-card p-1 rounded-xl border border-border flex gap-0.5 flex-wrap">
               {(['all', 'pending', 'preparing', 'ready', 'on_the_way', 'arrived', 'done', 'cancelled'] as const).map(s => (
                 <button
                   key={s}
                   onClick={() => setFilter(s)}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                  className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-bold transition-all ${
                     filter === s ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
@@ -243,13 +243,13 @@ export default function OrderManager() {
         </div>
 
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
           <input 
             type="text" 
-            placeholder="Tìm theo tên bé, tên món hoặc mã đơn..." 
+            placeholder="Tìm bé, món hoặc mã đơn..." 
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-4 bg-card border border-border rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium text-foreground"
+            className="w-full pl-11 pr-4 py-3 md:py-4 bg-card border border-border rounded-xl md:rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium text-[13px] md:text-base text-foreground"
           />
         </div>
       </div>
@@ -309,37 +309,37 @@ function OrderCard({ order, recipe, review, kid, onUpdate }: OrderCardProps) {
         exit={{ opacity: 0, scale: 0.9 }}
         className="bg-card rounded-[32px] border border-border shadow-sm overflow-hidden flex flex-col hover:shadow-xl transition-all"
       >
-        <div className="p-6 border-b border-border/50 flex justify-between items-start">
-          <div className="flex gap-4">
+        <div className="p-4 md:p-6 border-b border-border/50 flex justify-between items-start">
+          <div className="flex gap-3 md:gap-4">
             <Avatar 
               src={kid?.avatar} 
               name={kid?.name || order.kidId} 
-              size={48} 
-              className="rounded-2xl border-2 border-border"
+              size={40} 
+              className="rounded-xl md:rounded-2xl border-2 border-border"
             />
-            <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Đơn hàng #{order.id?.slice(-6)}</p>
-              <h3 className="text-lg font-black text-foreground tracking-tight">{kidName}</h3>
+            <div className="min-w-0">
+              <p className="text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5 md:mb-1">Đơn hàng #{order.id?.slice(-6)}</p>
+              <h3 className="text-base md:text-lg font-black text-foreground tracking-tight truncate">{kidName}</h3>
             </div>
           </div>
-        <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-2 border ${config.color}`}>
-          <Icon size={12} strokeWidth={3} />
+        <div className={`px-2.5 md:px-4 py-1 md:py-1.5 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 md:gap-2 border shrink-0 ${config.color}`}>
+          <Icon size={10} strokeWidth={3} className="md:w-3 md:h-3" />
           {config.label}
         </div>
       </div>
 
-      <div className="p-6 bg-secondary/30 flex flex-col gap-4">
-        <div className="flex gap-4">
-          <div className="w-16 h-16 rounded-2xl overflow-hidden bg-background shadow-sm flex-shrink-0">
+      <div className="p-4 md:p-6 bg-secondary/30 flex flex-col gap-3 md:gap-4">
+        <div className="flex gap-3 md:gap-4">
+          <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl overflow-hidden bg-background shadow-sm flex-shrink-0">
             {recipe?.imageUrl ? (
               <img src={getOptimizedUrl(recipe.imageUrl, 200)} className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground/30"><Utensils size={24} /></div>
+              <div className="w-full h-full flex items-center justify-center text-muted-foreground/30"><Utensils size={20} /></div>
             )}
           </div>
           <div className="flex flex-col justify-center min-w-0">
-            <h4 className="font-bold text-foreground text-sm line-clamp-1 mb-1 leading-tight">{recipe?.title || 'Đang tải...'}</h4>
-            <p className="text-[10px] text-muted-foreground font-medium tracking-tight">Cập nhật: {order.updatedAt ? format(order.updatedAt.toDate(), 'HH:mm', { locale: vi }) : '---'}</p>
+            <h4 className="font-bold text-foreground text-xs md:text-sm line-clamp-1 mb-0.5 md:mb-1 leading-tight">{recipe?.title || 'Đang tải...'}</h4>
+            <p className="text-[9px] md:text-[10px] text-muted-foreground font-medium tracking-tight">Cập nhật: {order.updatedAt ? format(order.updatedAt.toDate(), 'HH:mm', { locale: vi }) : '---'}</p>
           </div>
         </div>
 
@@ -375,27 +375,27 @@ function OrderCard({ order, recipe, review, kid, onUpdate }: OrderCardProps) {
         )}
       </div>
 
-      <div className="p-5 border-t border-border/50">
+      <div className="p-4 md:p-5 border-t border-border/50">
         {order.status === 'ready' && (
-          <div className="w-full py-4 flex items-center justify-center gap-2 text-muted-foreground font-bold text-sm bg-secondary rounded-[20px]">
-            <Clock size={16} />
+          <div className="w-full py-3 md:py-4 flex items-center justify-center gap-2 text-muted-foreground font-bold text-[13px] md:text-sm bg-secondary rounded-[16px] md:rounded-[20px]">
+            <Clock size={14} />
             Chờ bé đến lấy...
           </div>
         )}
         {order.status === 'on_the_way' && (
-          <div className="w-full py-4 flex items-center justify-center gap-2 text-primary font-bold text-sm bg-primary/10 rounded-[20px]">
-             <Navigation size={16} className="rotate-45 animate-pulse" /> Bé đang trên đường đến
+          <div className="w-full py-3 md:py-4 flex items-center justify-center gap-2 text-primary font-bold text-[13px] md:text-sm bg-primary/10 rounded-[16px] md:rounded-[20px]">
+             <Navigation size={14} className="rotate-45 animate-pulse" /> Bé đang trên đường đến
           </div>
         )}
         {order.status === 'arrived' && (
-          <div className="w-full py-4 flex items-center justify-center gap-2 text-green-600 font-bold text-sm bg-green-500/10 rounded-[20px] mb-2">
-             <MapPin size={16} className="animate-bounce" /> Bé đã tới bếp!
+          <div className="w-full py-3 md:py-4 flex items-center justify-center gap-2 text-green-600 font-bold text-[13px] md:text-sm bg-green-500/10 rounded-[16px] md:rounded-[20px] mb-2">
+             <MapPin size={14} className="animate-bounce" /> Bé đã tới bếp!
           </div>
         )}
         {config.next ? (
           <button 
             onClick={() => onUpdate(order.id!, config.next!)}
-            className={`w-full flex items-center justify-center gap-2 font-black py-4 rounded-[20px] transition-all shadow-lg active:scale-[0.97] text-sm uppercase tracking-widest ${
+            className={`w-full flex items-center justify-center gap-2 font-black py-3 md:py-4 rounded-[16px] md:rounded-[20px] transition-all shadow-lg active:scale-[0.97] text-[13px] md:text-sm uppercase tracking-widest ${
               order.status === 'arrived' 
                 ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-primary-shadow/30' 
                 : 'bg-primary text-primary-foreground hover:opacity-90 shadow-primary-shadow/30'
@@ -405,8 +405,8 @@ function OrderCard({ order, recipe, review, kid, onUpdate }: OrderCardProps) {
           </button>
         ) : (
           !['ready', 'on_the_way'].includes(order.status) && (
-            <div className={`w-full py-4 flex items-center justify-center gap-2 font-bold text-sm rounded-[20px] ${order.status === 'cancelled' ? 'bg-destructive/10 text-destructive' : 'bg-secondary text-muted-foreground'}`}>
-              {order.status === 'cancelled' ? <Trash2 size={16} /> : <CheckCircle2 size={16} />}
+            <div className={`w-full py-3 md:py-4 flex items-center justify-center gap-2 font-bold text-[13px] md:text-sm rounded-[16px] md:rounded-[20px] ${order.status === 'cancelled' ? 'bg-destructive/10 text-destructive' : 'bg-secondary text-muted-foreground'}`}>
+              {order.status === 'cancelled' ? <Trash2 size={14} /> : <CheckCircle2 size={14} />}
               {order.status === 'cancelled' ? 'Đã huỷ' : 'Đã hoàn tất'}
             </div>
           )
