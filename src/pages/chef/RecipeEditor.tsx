@@ -283,15 +283,12 @@ export default function RecipeEditor() {
                 // Auto-create news if transitioning from draft to published
                 if (isPublished && !initialPublished) {
                     const newsTitle = `Món mới: ${title}!`;
-                    const newsContent = [
-                        `🌟 **Mô tả:** ${description}`,
-                        `📍 **Nguyên liệu:**\n${formattedIngredients.map((i) => `  • ${i}`).join("\n")}`,
-                        `👨‍🍳 **Cách làm:**\n${steps
-                            .filter((s) => s.trim())
-                            .map((s, idx) => `  ${idx + 1}. ${s}`)
-                            .join("\n")}`,
-                        `\nĐầu bếp vừa mới hoàn thiện món **${title}**. Bé cùng khám phá ngay nhé! ❤️`,
-                    ].join("\n\n");
+                    const newsContent = `<h2><strong>Mô tả</strong></h2><p>${description}</p><h2><strong>Nguyên liệu</strong></h2><ul>${formattedIngredients.map((i) => `<li>${i}</li>`).join("")}</ul><h2><strong>Cách làm</strong></h2><ol>${steps
+                        .filter((s) => s.trim())
+                        .map((s) => `<li>${s}</li>`)
+                        .join(
+                            "",
+                        )}</ol><p>Cùng chào đón món <strong>${title}</strong> cực hấp dẫn sắp có mặt tại bếp nhoa! Bé nhớ qua thử nhé. 😋</p>`;
 
                     await addDoc(collection(db, "news"), {
                         title: newsTitle,
