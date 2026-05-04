@@ -19,7 +19,6 @@ export const initOneSignal = async () => {
     // Use a window flag to prevent multiple init calls in dev/strict mode
     if ((window as any)._oneSignalInitialized) return;
 
-    console.log({ appID: import.meta.env.VITE_ONESIGNAL_APP_ID });
     try {
         await OneSignal.init({
             appId: import.meta.env.VITE_ONESIGNAL_APP_ID,
