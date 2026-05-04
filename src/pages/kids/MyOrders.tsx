@@ -877,7 +877,7 @@ export default function MyOrders() {
 
     return (
         <div className="h-full overflow-y-auto scrollbar-hide kid-page-content">
-            <div className="max-w-[680px] mx-auto space-y-[2px] mb-8">
+            <div className="max-w-[680px] mx-auto space-y-[2px]">
                 <h1 className="text-[20px] font-semibold text-foreground">
                     {isReviewsPage ? "Lịch sử đánh giá" : "Món Bé đã đặt"}
                 </h1>
