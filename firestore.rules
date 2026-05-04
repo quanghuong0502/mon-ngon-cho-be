@@ -139,12 +139,14 @@ service cloud.firestore {
 
     // --- Kitchen Config Validation ---
     function isValidKitchenConfig(data) {
-      return data.keys().hasAll(['name', 'directions', 'mapsShareLink', 'openTime', 'closeTime', 'servingDays', 'readyMessage'])
+      return data.keys().hasAll(['name', 'directions', 'mapsShareLink', 'openTime', 'closeTime', 'orderStartTime', 'orderEndTime', 'servingDays', 'readyMessage'])
         && data.name is string && data.name.size() > 0
         && data.directions is string
         && data.mapsShareLink is string
         && data.openTime is string
         && data.closeTime is string
+        && data.orderStartTime is string
+        && data.orderEndTime is string
         && data.servingDays is list
         && data.readyMessage is string;
     }

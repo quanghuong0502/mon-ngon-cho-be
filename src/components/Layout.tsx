@@ -119,7 +119,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               className="mr-3 ring-2 ring-card group-hover:ring-primary/20 transition-all"
             />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-foreground truncate">{user.name}</p>
+              <p className="text-sm font-bold text-foreground truncate">{user.name || 'Người dùng'}</p>
               <p className="text-xs text-muted-foreground italic lowercase">{user.role === 'chef' ? 'Đầu bếp' : 'Em bé'}</p>
             </div>
           </NavLink>
@@ -137,7 +137,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 flex flex-col bg-background relative min-w-0 overflow-hidden pb-[72px] md:pb-0">
         <header className="h-16 px-4 md:px-8 flex items-center justify-between border-b border-border bg-card/50 backdrop-blur-md">
           <h1 className="text-[18px] font-semibold text-foreground md:block hidden">
-            {user.role === 'chef' ? 'Chào đầu bếp!' : `Chào bé ${user.name.split(' ').pop()}!`}
+            {user?.role === 'chef' ? 'Chào đầu bếp!' : `Chào bé ${((user?.name || 'bé') as string).split(' ').pop()}!`}
           </h1>
           <Link 
             to={user.role === 'chef' ? '/chef/dashboard' : '/kids/home'}

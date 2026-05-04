@@ -31,6 +31,7 @@ import {
   CircleCheckBig,
   UtensilsCrossed,
   Trash2,
+  Lock,
   Utensils
 } from 'lucide-react';
 import { format, startOfWeek, addDays, isBefore, startOfDay, addWeeks, isSameDay } from 'date-fns';
@@ -109,7 +110,8 @@ const statusColors: Record<string, string> = {
 
 const MealCard = memo(({ 
   recipe, 
-  isLocked, 
+  isVisualLocked,
+  isSelectionDisabled,
   handleSelect, 
   dayKey, 
   isEditing, 
@@ -121,7 +123,8 @@ const MealCard = memo(({
   variant = 'desktop'
 }: {
   recipe: Recipe;
-  isLocked: boolean;
+  isVisualLocked: boolean;
+  isSelectionDisabled: boolean;
   handleSelect: (day: string, recipeId: string) => void;
   dayKey: string;
   isEditing: boolean;
@@ -138,12 +141,12 @@ const MealCard = memo(({
     return (
       <div className="relative">
         <motion.div
-          onClick={() => !isLocked && handleSelect(dayKey, recipe.id!)}
+          onClick={() => !isSelectionDisabled && handleSelect(dayKey, recipe.id!)}
           className={`relative rounded-2xl border-2 transition-all overflow-hidden bg-card ${
             isActive 
               ? 'border-primary bg-primary/5' 
               : 'border-border'
-          } ${isLocked && !isMealConfirmed ? 'opacity-40' : ''}`}
+          } ${isVisualLocked && !isActive ? 'opacity-40 grayscale cursor-not-allowed' : ''}`}
         >
           <div className="h-[160px] w-full relative">
             {recipe.imageUrl ? (
@@ -153,11 +156,21 @@ const MealCard = memo(({
                 <UtensilsCrossed size={32} />
               </div>
             )}
+            
+            {/* Lock Overlay */}
+            {isVisualLocked && (
+              <div className="absolute inset-0 bg-background/20 backdrop-blur-[0.5px] flex flex-col items-center justify-center z-30">
+                <div className="bg-background/90 p-2 rounded-full shadow-lg mb-2">
+                  <Lock size={20} className="text-muted-foreground" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground bg-background/90 px-2 py-0.5 rounded">Khóa</span>
+              </div>
+            )}
             <div className="absolute top-2.5 right-2.5 z-20">
               <HeartButton recipeId={recipe.id!} size={32} />
             </div>
             {isMealConfirmed && (
-              <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-primary text-primary-foreground px-2.5 py-1 rounded-lg text-[11px] font-bold shadow-lg">
+              <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-primary text-primary-foreground px-2.5 py-1.5 rounded-xl text-[10px] font-black shadow-xl shadow-primary-shadow/60 z-40">
                 <Check size={12} strokeWidth={4} />
                 MÓN ĐÃ CHỌN
               </div>
@@ -186,13 +199,13 @@ const MealCard = memo(({
     <motion.div 
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      whileHover={!isLocked ? { y: -2 } : {}}
-      onClick={() => !isLocked && handleSelect(dayKey, recipe.id!)}
+      whileHover={!isSelectionDisabled ? { y: -2 } : {}}
+      onClick={() => !isSelectionDisabled && handleSelect(dayKey, recipe.id!)}
       className={`relative group rounded-2xl border-2 transition-all overflow-hidden ${
         isActive 
           ? 'bg-primary/5 border-primary shadow-lg shadow-primary-shadow/50' 
           : 'bg-card border-border shadow-sm hover:border-primary/50'
-      } ${isDimmed ? 'opacity-[0.35] cursor-not-allowed' : 'opacity-100 cursor-pointer'}`}
+      } ${isVisualLocked && !isActive ? 'opacity-40 grayscale cursor-not-allowed' : 'opacity-100 cursor-pointer'}`}
     >
       <div className="h-[120px] w-full bg-secondary relative group-hover:brightness-95 transition-all">
         {recipe.imageUrl ? (
@@ -202,14 +215,27 @@ const MealCard = memo(({
             <UtensilsCrossed size={32} />
           </div>
         )}
+
+        {/* Lock Overlay for Desktop */}
+        {isVisualLocked && (
+          <div className="absolute inset-0 bg-background/20 backdrop-blur-[0.5px] flex flex-col items-center justify-center z-30">
+             <div className="bg-background/90 p-1.5 rounded-full shadow-lg mb-1">
+                <Lock size={16} className="text-muted-foreground" />
+             </div>
+             <span className="text-[8px] font-black uppercase tracking-widest text-muted-foreground bg-background/90 px-1.5 py-0.5 rounded">Hết giờ</span>
+          </div>
+        )}
         
         <div className="absolute top-2 right-2 z-20">
           <HeartButton recipeId={recipe.id!} size={28} />
         </div>
         
-        {showCheckmark && (
-          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg border-2 border-card z-10">
-            <Check size={14} strokeWidth={4} />
+        {isActive && (
+          <div className="absolute top-2 left-2 z-40">
+            <div className="bg-primary text-primary-foreground px-2 py-0.5 rounded-md text-[8px] font-black uppercase flex items-center gap-1 shadow-lg shadow-primary-shadow/50">
+              <Check size={8} strokeWidth={4} />
+              <span>Món đã chọn</span>
+            </div>
           </div>
         )}
 
@@ -266,6 +292,7 @@ export default function KidsOrder() {
   const [configLoading, setConfigLoading] = useState(true);
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
   const [servingDays, setServingDays] = useState<string[]>(['mon', 'tue', 'wed', 'thu', 'fri']);
+  const [kitchenConfig, setKitchenConfig] = useState<any>(null);
   
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>('');
@@ -277,47 +304,108 @@ export default function KidsOrder() {
 
   const activeDays = ALL_DAYS.filter(d => servingDays.includes(d.key));
 
+  // Thêm state để trigger re-render mỗi phút, giúp bộ đếm giờ khóa luôn chính xác
+  const [now, setNow] = useState(new Date());
+
   useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const docRef = doc(db, 'config', 'main');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.servingDays && Array.isArray(data.servingDays)) {
-            setServingDays(data.servingDays);
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching kitchen config:', err);
-      } finally {
-        setConfigLoading(false);
+    const timer = setInterval(() => {
+      setNow(new Date());
+    }, 60000); // Cập nhật mỗi phút
+    return () => clearInterval(timer);
+  }, []);
+
+  const getDayLockStatus = (dayKey: string) => {
+    const idx = ALL_DAYS.findIndex(d => d.key === dayKey);
+    const dayDate = addDays(currentWeekStart, idx);
+    const today = startOfDay(now);
+    const tomorrow = addDays(today, 1);
+    
+    const isPastOrToday = isBefore(dayDate, tomorrow); // Bao gồm cả hôm nay và quá khứ
+    const isToday = isSameDay(dayDate, today);
+    const isTomorrow = isSameDay(dayDate, tomorrow);
+    const isFuture = isBefore(tomorrow, dayDate);
+
+    let isTimeLocked = false;
+    let windowInfo = null;
+
+    if (isPastOrToday) {
+      isTimeLocked = true;
+    } else if (isTomorrow && kitchenConfig) {
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      
+      const startTime = kitchenConfig.orderStartTime || '07:00';
+      const endTime = kitchenConfig.orderEndTime || '17:00';
+
+      const [startH, startM] = startTime.split(':').map(Number);
+      const startMinutes = startH * 60 + startM;
+      
+      const [endH, endM] = endTime.split(':').map(Number);
+      const endMinutes = endH * 60 + endM;
+
+      if (currentMinutes < startMinutes || currentMinutes >= endMinutes) {
+        isTimeLocked = true;
       }
+      windowInfo = { start: startTime, end: endTime };
+    }
+    // Nếu là isFuture (từ ngày kia trở đi) thì isTimeLocked luôn là false
+
+    return {
+      isPast: isBefore(dayDate, today),
+      isToday,
+      isTomorrow,
+      isDateLocked: isTimeLocked,
+      windowInfo
     };
-    fetchConfig();
+  };
+
+  useEffect(() => {
+    const docRef = doc(db, 'config', 'main');
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setKitchenConfig(data);
+        if (data.servingDays && Array.isArray(data.servingDays)) {
+          setServingDays(data.servingDays);
+        }
+      }
+      setConfigLoading(false);
+    }, (err) => {
+      console.error('Error listening to kitchen config:', err);
+      setConfigLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     if (servingDays.length > 0 && !hasInitializedTab.current) {
-      const getTodayTab = () => {
-        const day = new Date().getDay(); // 0=Sun, 1=Mon...6=Sat
+      const getTomorrowTab = () => {
+        const tomorrow = addDays(new Date(), 1);
+        const day = tomorrow.getDay(); // 0=Sun, 1=Mon...6=Sat
         const dayMap: Record<number, string> = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat', 0: 'sun' };
-        const todayKey = dayMap[day];
+        const tomorrowKey = dayMap[day];
         
-        // If today is a serving day → select it
-        if (servingDays.includes(todayKey)) return todayKey;
+        // Find if tomorrow is a serving day
+        if (servingDays.includes(tomorrowKey)) return tomorrowKey;
         
-        // If weekend or not serving → select next available future serving day
+        // Find next available serving day from tomorrow
         const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-        const todayIndex = dayOrder.indexOf(todayKey);
-        for (let i = todayIndex + 1; i < dayOrder.length; i++) {
+        const startIndex = dayOrder.indexOf(tomorrowKey);
+        
+        // Check remaining days of the current week (from tomorrow)
+        for (let i = startIndex; i < dayOrder.length; i++) {
           if (servingDays.includes(dayOrder[i])) return dayOrder[i];
         }
-        // Fallback: first serving day of week
+        
+        // Check from beginning of week
+        for (let i = 0; i < startIndex; i++) {
+          if (servingDays.includes(dayOrder[i])) return dayOrder[i];
+        }
+        
         return servingDays[0];
       };
 
-      setSelectedDay(getTodayTab());
+      setSelectedDay(getTomorrowTab());
       hasInitializedTab.current = true;
     }
   }, [servingDays]);
@@ -421,6 +509,13 @@ export default function KidsOrder() {
   }, [user, weekId]);
 
   const handleSelect = (day: string, recipeId: string) => {
+    // Luôn kiểm tra khóa thời gian trước khi cho phép chọn món
+    const { isDateLocked } = getDayLockStatus(day);
+    if (isDateLocked) {
+      toast.error('Hiện tại đã hết giờ đặt/thay đổi món cho ngày này.', { id: 'lock-error' });
+      return;
+    }
+
     const order = orders[day];
     const isEditing = !!tempSelections[day];
 
@@ -429,14 +524,32 @@ export default function KidsOrder() {
       return;
     }
 
-    setTempSelections(prev => {
-      const current = prev[day] || (order?.status !== 'cancelled' ? order?.recipeIds || (order?.recipeId ? [order.recipeId] : []) : []);
-      if (current.includes(recipeId)) {
-        const next = current.filter(id => id !== recipeId);
-        return { ...prev, [day]: next };
+    const isActuallyEditingExisting = order && order.status !== 'cancelled';
+    const current = tempSelections[day] || (isActuallyEditingExisting ? order?.recipeIds || (order?.recipeId ? [order.recipeId] : []) : []);
+
+    if (current.includes(recipeId)) {
+      const next = current.filter(id => id !== recipeId);
+      
+      // Nếu đang sửa đơn hàng cũ, không cho phép bỏ chọn toàn bộ
+      if (isActuallyEditingExisting && next.length === 0) {
+        toast.error('Bé phải chọn ít nhất 1 món nhé!', { id: 'min-meal-error' });
+        return;
       }
-      return { ...prev, [day]: [...current, recipeId] };
-    });
+
+      // If it's a new order and they unselect everything, clear temp selection
+      if (!isActuallyEditingExisting && next.length === 0) {
+        setTempSelections(prev => {
+          const nextPrev = { ...prev };
+          delete nextPrev[day];
+          return nextPrev;
+        });
+        return;
+      }
+
+      setTempSelections(prev => ({ ...prev, [day]: next }));
+    } else {
+      setTempSelections(prev => ({ ...prev, [day]: [...current, recipeId] }));
+    }
   };
 
   const handleCancelEditing = (day: string) => {
@@ -448,6 +561,12 @@ export default function KidsOrder() {
   };
 
   const handleConfirm = async (day: string) => {
+    const { isDateLocked } = getDayLockStatus(day);
+    if (isDateLocked) {
+      toast.error('Hiện tại không trong thời gian đặt món cho ngày này.', { id: 'lock-error' });
+      return;
+    }
+
     const recipeIds = tempSelections[day];
     if (!user || !recipeIds || recipeIds.length === 0) return;
 
@@ -501,6 +620,13 @@ export default function KidsOrder() {
     const day = cancelModal.day;
     if (!day) return;
     
+    const { isDateLocked } = getDayLockStatus(day);
+    if (isDateLocked) {
+      toast.error('Đã quá thời gian để huỷ món cho ngày này.');
+      setCancelModal({ isOpen: false, day: null });
+      return;
+    }
+
     const order = orders[day];
     if (!order || order.status !== 'pending') return;
 
@@ -580,10 +706,7 @@ export default function KidsOrder() {
               .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
             `}} />
             {mobileTabs.map((tab) => {
-              const idx = ALL_DAYS.findIndex(d => d.key === tab.key);
-              const dayDate = addDays(currentWeekStart, idx);
-              const isPast = isBefore(dayDate, startOfDay(new Date()));
-              const isToday = isSameDay(dayDate, new Date());
+              const { isToday, isTomorrow, isDateLocked, windowInfo } = getDayLockStatus(tab.key);
               const order = orders[tab.key];
               const isSelected = selectedDay === tab.key;
               
@@ -595,7 +718,7 @@ export default function KidsOrder() {
                     isSelected 
                       ? 'bg-primary text-primary-foreground' 
                       : 'bg-secondary text-muted-foreground'
-                  } ${isPast ? 'opacity-45' : 'opacity-100'} ${isToday ? 'font-semibold underline decoration-primary/30' : ''}`}
+                  } ${isDateLocked ? 'opacity-45' : 'opacity-100'} ${isToday ? 'font-semibold underline decoration-primary/30' : ''}`}
                 >
                   {order && order.status !== 'cancelled' && (
                     <div className={`absolute -top-1 -right-0.5 w-[7px] h-[7px] rounded-full border border-card z-10 ${
@@ -632,20 +755,19 @@ export default function KidsOrder() {
                 const day = ALL_DAYS.find(d => d.key === selectedDay);
                 if (!day) return null;
 
-                const idx = ALL_DAYS.findIndex(d => d.key === day.key);
-                const dayDate = addDays(currentWeekStart, idx);
-                const isPast = isBefore(dayDate, startOfDay(new Date()));
-                const isToday = isSameDay(dayDate, new Date());
-                const isDateLocked = isPast || isToday;
-
+                const { isToday, isTomorrow, isDateLocked, windowInfo } = getDayLockStatus(day.key);
                 const slotRecipes = weeklyMenu.slots[day.key as keyof WeeklyMenu['slots']] || [];
                 const order = orders[day.key];
                 const orderRecipeIds = order?.recipeIds || (order?.recipeId ? [order.recipeId] : []);
                 const tempSelection = tempSelections[day.key];
                 const isConfirmed = order && order.status !== 'cancelled';
                 const isPending = order?.status === 'pending';
-                const isEditing = !!tempSelection;
-                const isLocked = (isConfirmed && !isPending) || isDateLocked || (isConfirmed && !isEditing);
+                const isEditing = !!tempSelection && tempSelection.length > 0;
+                
+                // Visual lock only when time is passed or order is locked (non-pending)
+                const isVisualLocked = isDateLocked || (isConfirmed && !isPending);
+                // Selection is disabled if day is locked OR if order is confirmed and we aren't in editing mode
+                const isSelectionDisabled = isVisualLocked || (isConfirmed && !isEditing);
                 
                 // Compare arrays
                 const hasChanges = isEditing && (
@@ -665,6 +787,19 @@ export default function KidsOrder() {
 
                 return (
                   <div className="space-y-4">
+                    {/* Header Warning for Locked State */}
+                    {isDateLocked && (
+                      <div className="mx-0 p-4 rounded-2xl bg-destructive/5 border border-destructive/10 flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                          <Lock size={18} className="text-destructive" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-bold text-destructive">Đã hết giờ đặt món</p>
+                          <p className="text-[11px] text-destructive/70 leading-relaxed font-medium">Bé có thể xem lại món đã đặt nhưng không thể thay đổi.</p>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex flex-col gap-3">
                       {slotRecipes.map(recipeId => {
                         const recipe = recipes[recipeId];
@@ -677,14 +812,15 @@ export default function KidsOrder() {
                           <MealCard
                             key={recipeId}
                             recipe={recipe}
-                            isLocked={isLocked}
+                            isVisualLocked={isVisualLocked}
+                            isSelectionDisabled={isSelectionDisabled}
                             handleSelect={handleSelect}
                             dayKey={day.key}
                             isEditing={isEditing}
                             isMealSelected={isMealSelected}
                             isMealConfirmed={isMealConfirmed}
                             showCheckmark={!isEditing && isMealConfirmed}
-                            isDimmed={isLocked && !isMealConfirmed}
+                            isDimmed={isVisualLocked && !isMealConfirmed}
                             onInfoClick={setSelectedRecipe}
                             variant="mobile"
                           />
@@ -695,7 +831,7 @@ export default function KidsOrder() {
 
                     {/* Action Row for Mobile Pending Order */}
                     <AnimatePresence>
-                      {order && order.status === 'pending' && !isEditing && (
+                      {order && order.status === 'pending' && !isEditing && !isDateLocked && (
                         <motion.div 
                           initial={{ y: 100, opacity: 0 }}
                           animate={{ y: 0, opacity: 1 }}
@@ -719,6 +855,14 @@ export default function KidsOrder() {
                     </AnimatePresence>
 
                     {/* Status Pills for Locked Status - Mobile */}
+                    {isTomorrow && isDateLocked && !isConfirmed && (
+                      <div className="flex justify-center pt-3">
+                        <div className="bg-destructive/10 text-destructive px-4 py-1.5 rounded-full text-[13px] font-medium border border-destructive/20 flex items-center gap-2">
+                           <Info size={12} />
+                           Đã hết giờ đặt món cho ngày mai ({windowInfo?.start} - {windowInfo?.end})
+                        </div>
+                      </div>
+                    )}
                     {isConfirmed && !isPending && (
                       <div className="flex justify-center pt-3">
                         {order.status === 'preparing' && (
@@ -752,9 +896,9 @@ export default function KidsOrder() {
                           >
                             <button 
                               onClick={() => handleConfirm(day.key)}
-                              disabled={submitting[day.key] || !hasChanges}
+                              disabled={submitting[day.key] || !hasChanges || isDateLocked}
                               className={`flex-1 h-[52px] font-semibold rounded-[14px] shadow-xl flex items-center justify-center gap-2 text-[15px] transition-all ${
-                                hasChanges 
+                                (hasChanges && !isDateLocked) 
                                 ? 'bg-primary text-primary-foreground' 
                                 : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'
                               }`}
@@ -791,11 +935,7 @@ export default function KidsOrder() {
               }}
             >
               {activeDays.map((day) => {
-              const idx = ALL_DAYS.findIndex(d => d.key === day.key);
-              const dayDate = addDays(currentWeekStart, idx);
-              const isPast = isBefore(dayDate, startOfDay(new Date()));
-              const isToday = isSameDay(dayDate, new Date());
-              const isDateLocked = isPast || isToday;
+              const { isToday, isTomorrow, isDateLocked, windowInfo } = getDayLockStatus(day.key);
 
               const slotRecipes = weeklyMenu.slots[day.key as keyof WeeklyMenu['slots']] || [];
               const order = orders[day.key];
@@ -803,8 +943,12 @@ export default function KidsOrder() {
               const tempSelection = tempSelections[day.key];
               const isConfirmed = order && order.status !== 'cancelled';
               const isPending = order?.status === 'pending';
-              const isEditing = !!tempSelection;
-              const isLocked = (isConfirmed && !isPending) || isDateLocked || (isConfirmed && !isEditing);
+              const isEditing = !!tempSelection && tempSelection.length > 0;
+              
+              // Visual lock only when time is passed or order is locked (non-pending)
+              const isVisualLocked = isDateLocked || (isConfirmed && !isPending);
+              // Selection is disabled if day is locked OR if order is confirmed and we aren't in editing mode
+              const isSelectionDisabled = isVisualLocked || (isConfirmed && !isEditing);
               
               const hasChanges = isEditing && (
                 tempSelection.length !== orderRecipeIds.length || 
@@ -813,15 +957,23 @@ export default function KidsOrder() {
               );
 
               return (
-                <div key={day.key} className={`flex flex-col gap-3 ${isDateLocked ? 'opacity-60' : ''}`}>
+                <div key={day.key} className={`flex flex-col gap-3 ${isDateLocked ? 'opacity-100' : ''}`}>
                   <div className="px-4 py-2 flex flex-col gap-1.5">
                     <div className="flex items-center gap-2">
-                      <h3 className={`text-xs font-black uppercase tracking-[0.2em] ${isDateLocked ? 'text-muted-foreground/30' : 'text-muted-foreground'}`}>
+                       <h3 className={`text-xs font-black uppercase tracking-[0.2em] ${isDateLocked ? 'text-foreground' : 'text-muted-foreground'}`}>
                         {day.label}
                       </h3>
                       {isToday && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
                     </div>
                     
+                    {/* Locked Message Header Desktop */}
+                    {isDateLocked && (
+                      <div className="mb-1 p-2 rounded-xl bg-destructive/5 border border-destructive/10 flex items-center gap-2">
+                        <Lock size={12} className="text-destructive" />
+                        <span className="text-[10px] font-bold text-destructive uppercase tracking-wider">Hết giờ</span>
+                      </div>
+                    )}
+
                     <div className="flex flex-col gap-1">
                       {order && (
                         <>
@@ -833,6 +985,14 @@ export default function KidsOrder() {
                             <span className={`text-[10px] font-medium text-muted-foreground px-1 ${order.status === 'done' || order.status === 'cancelled' ? 'sr-only' : ''}`}>
                               {lockMessages[order.status]}
                             </span>
+                          )}
+                          {isTomorrow && isDateLocked && !isConfirmed && (
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-destructive/5 text-destructive rounded-lg border border-destructive/10">
+                              <Info size={10} />
+                              <span className="text-[10px] font-medium">
+                                Đã hết giờ đặt cho ngày mai ({windowInfo?.start} - {windowInfo?.end})
+                              </span>
+                            </div>
                           )}
                         </>
                       )}
@@ -848,13 +1008,14 @@ export default function KidsOrder() {
                         const isMealConfirmed = orderRecipeIds.includes(recipeId) && order?.status !== 'cancelled';
                         const isMealSelected = tempSelection?.includes(recipeId);
                         const showCheckmark = !isEditing && isMealConfirmed;
-                        const isDimmed = isLocked && !isMealConfirmed;
+                        const isDimmed = isVisualLocked && !isMealConfirmed;
 
                         return (
                           <MealCard
                             key={recipeId}
                             recipe={recipe}
-                            isLocked={isLocked}
+                            isVisualLocked={isVisualLocked}
+                            isSelectionDisabled={isSelectionDisabled}
                             handleSelect={handleSelect}
                             dayKey={day.key}
                             isEditing={isEditing}
@@ -884,8 +1045,8 @@ export default function KidsOrder() {
                           >
                             <button 
                               onClick={() => handleConfirm(day.key)}
-                              disabled={submitting[day.key] || !hasChanges}
-                              className={`flex-1 py-3 bg-primary hover:opacity-90 text-primary-foreground font-bold rounded-xl shadow-lg shadow-primary-shadow/30 transition-all flex items-center justify-center gap-1.5 ${!hasChanges && 'opacity-50 cursor-not-allowed'}`}
+                              disabled={submitting[day.key] || !hasChanges || isDateLocked}
+                              className={`flex-1 py-3 bg-primary hover:opacity-90 text-primary-foreground font-bold rounded-xl shadow-lg shadow-primary-shadow/30 transition-all flex items-center justify-center gap-1.5 ${(!hasChanges || isDateLocked) && 'opacity-50 cursor-not-allowed'}`}
                             >
                               {submitting[day.key] ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                               <span className="text-[10px] uppercase tracking-wider">Xác nhận</span>
@@ -901,7 +1062,7 @@ export default function KidsOrder() {
                         )}
                       </AnimatePresence>
 
-                      {order && order.status === 'pending' && !isEditing && (
+                      {order && order.status === 'pending' && !isEditing && !isDateLocked && (
                         <div className="flex flex-row gap-2 pt-4">
                           <button 
                             onClick={() => setTempSelections(prev => ({ ...prev, [day.key]: orderRecipeIds }))}

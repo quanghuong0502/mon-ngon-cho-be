@@ -22,24 +22,32 @@ import { db } from '../../lib/firebase';
 import { toast } from 'react-hot-toast';
 import { useTheme } from '../../context/ThemeContext';
 
+interface OrderTime {
+  start: string;
+  end: string;
+}
+
 interface KitchenConfig {
   name: string;
   directions: string;
   mapsShareLink: string;
   openTime: string;
   closeTime: string;
+  orderStartTime: string;
+  orderEndTime: string;
+  orderTimes?: Record<string, OrderTime>;
   servingDays: string[];
   readyMessage: string;
 }
 
 const DAYS_MAP = [
-  { key: 'mon', label: 'T2' },
-  { key: 'tue', label: 'T3' },
-  { key: 'wed', label: 'T4' },
-  { key: 'thu', label: 'T5' },
-  { key: 'fri', label: 'T6' },
-  { key: 'sat', label: 'T7' },
-  { key: 'sun', label: 'CN' },
+  { key: 'mon', label: 'T2', full: 'Thứ Hai' },
+  { key: 'tue', label: 'T3', full: 'Thứ Ba' },
+  { key: 'wed', label: 'T4', full: 'Thứ Tư' },
+  { key: 'thu', label: 'T5', full: 'Thứ Năm' },
+  { key: 'fri', label: 'T6', full: 'Thứ Sáu' },
+  { key: 'sat', label: 'T7', full: 'Thứ Bảy' },
+  { key: 'sun', label: 'CN', full: 'Chủ Nhật' },
 ];
 
 const DEFAULT_CONFIG: KitchenConfig = {
@@ -48,6 +56,17 @@ const DEFAULT_CONFIG: KitchenConfig = {
   mapsShareLink: '',
   openTime: '11:00',
   closeTime: '13:00',
+  orderStartTime: '07:00',
+  orderEndTime: '17:00',
+  orderTimes: {
+    mon: { start: '07:00', end: '17:00' },
+    tue: { start: '07:00', end: '17:00' },
+    wed: { start: '07:00', end: '17:00' },
+    thu: { start: '07:00', end: '17:00' },
+    fri: { start: '07:00', end: '17:00' },
+    sat: { start: '07:00', end: '17:00' },
+    sun: { start: '07:00', end: '17:00' },
+  },
   servingDays: ['mon', 'tue', 'wed', 'thu', 'fri'],
   readyMessage: 'Món ăn của bé đã sẵn sàng! Qua bếp lấy nhé'
 };
@@ -72,6 +91,9 @@ export default function ChefSettings() {
             mapsShareLink: data.mapsShareLink || data.mapsEmbedUrl || '',
             openTime: data.openTime || DEFAULT_CONFIG.openTime,
             closeTime: data.closeTime || DEFAULT_CONFIG.closeTime,
+            orderStartTime: data.orderStartTime || DEFAULT_CONFIG.orderStartTime,
+            orderEndTime: data.orderEndTime || DEFAULT_CONFIG.orderEndTime,
+            orderTimes: data.orderTimes || DEFAULT_CONFIG.orderTimes,
             servingDays: Array.isArray(data.servingDays) ? data.servingDays : DEFAULT_CONFIG.servingDays,
             readyMessage: data.readyMessage || DEFAULT_CONFIG.readyMessage,
           };
@@ -211,8 +233,50 @@ export default function ChefSettings() {
                   className="w-full px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium text-foreground"
                 />
               </div>
-              <div className="col-span-2">
-                <label className="block text-[10px] md:text-xs font-black uppercase text-muted-foreground tracking-widest mb-1.5 md:mb-2 ml-1">Ngày phục vụ</label>
+            </div>
+          </section>
+
+          {/* Section: Giờ đặt món */}
+          <section className="bg-card p-5 md:p-8 rounded-[24px] md:rounded-[32px] border border-border shadow-sm space-y-4 md:space-y-6">
+            <div className="flex items-center gap-2 md:gap-3 text-base md:text-lg font-bold text-foreground mb-2">
+              <Clock size={18} className="text-primary md:w-5 md:h-5" />
+              Khung giờ đặt món cho Ngày Mai
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed italic">
+              Bé chỉ có thể đặt hoặc thay đổi món của ngày mai trong khoảng thời gian này. Các ngày xa hơn sẽ không bị giới hạn.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
+              <div>
+                <label className="block text-[10px] md:text-xs font-black uppercase text-muted-foreground tracking-widest mb-1 md:mb-1.5 ml-1">Bắt đầu</label>
+                <input
+                  type="time"
+                  value={config.orderStartTime}
+                  onChange={(e) => setConfig({ ...config, orderStartTime: e.target.value })}
+                  className="w-full px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium text-foreground"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] md:text-xs font-black uppercase text-muted-foreground tracking-widest mb-1 md:mb-1.5 ml-1">Kết thúc</label>
+                <input
+                  type="time"
+                  value={config.orderEndTime}
+                  onChange={(e) => setConfig({ ...config, orderEndTime: e.target.value })}
+                  className="w-full px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-secondary border-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium text-foreground"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Section 4: Ngày phục vụ */}
+          <section className="bg-card p-5 md:p-8 rounded-[24px] md:rounded-[32px] border border-border shadow-sm space-y-4 md:space-y-6">
+            <div className="flex items-center gap-2 md:gap-3 text-base md:text-lg font-bold text-foreground mb-2">
+              <Sun size={18} className="text-primary md:w-5 md:h-5" />
+              Ngày phục vụ
+            </div>
+            
+            <div className="col-span-2">
                 <div className="flex flex-wrap gap-2">
                   {DAYS_MAP.map((day) => {
                     const isSelected = config.servingDays.includes(day.key);
@@ -234,7 +298,6 @@ export default function ChefSettings() {
                   })}
                 </div>
               </div>
-            </div>
           </section>
 
           {/* Section 4: Tin nhắn cho bé */}

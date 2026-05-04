@@ -122,6 +122,8 @@
         "mapsShareLink": { "type": "string" },
         "openTime": { "type": "string" },
         "closeTime": { "type": "string" },
+        "orderStartTime": { "type": "string" },
+        "orderEndTime": { "type": "string" },
         "servingDays": { "type": "array", "items": { "type": "string" } },
         "readyMessage": { "type": "string" }
       }
