@@ -68,7 +68,8 @@ export interface Order {
   kidId: string;
   weekId: string;
   day: 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
-  recipeId: string;
+  recipeId?: string; // Keep for backward compatibility during migration
+  recipeIds: string[];
   status: OrderStatus;
   createdAt: any;
   updatedAt: any;

@@ -103,7 +103,15 @@ export default function OrderManager() {
       setOrders(loadedOrders);
 
       // Fetch recipes and kid profiles for these orders
-      const recipeIds = Array.from(new Set(loadedOrders.map(o => o.recipeId))).filter(Boolean) as string[];
+      const recipeIdsSet = new Set<string>();
+      loadedOrders.forEach(o => {
+        if (o.recipeIds && o.recipeIds.length > 0) {
+          o.recipeIds.forEach(id => recipeIdsSet.add(id));
+        } else if (o.recipeId) {
+          recipeIdsSet.add(o.recipeId);
+        }
+      });
+      const recipeIds = Array.from(recipeIdsSet);
       const kidIds = Array.from(new Set(loadedOrders.map(o => o.kidId))).filter(Boolean) as string[];
       
       const recipeMap: Record<string, Recipe> = { ...recipes };
@@ -162,9 +170,16 @@ export default function OrderManager() {
         console.log(`Found kid ${order.kidId} with OneSignal IDs:`, oneSignalIds);
         
         if (oneSignalIds.length > 0) {
-          const recipe = recipes[order.recipeId];
-          const recipeName = recipe?.title || 'món ăn';
-          const displayRecipeName = recipeName.length > 30 ? recipeName.substring(0, 27) + '...' : recipeName;
+          const orderRecipeIds = order.recipeIds || (order.recipeId ? [order.recipeId] : []);
+          let recipeNames = 'món ăn';
+          
+          if (orderRecipeIds.length > 1) {
+            recipeNames = `${orderRecipeIds.length} món ăn`;
+          } else if (orderRecipeIds.length === 1) {
+            recipeNames = recipes[orderRecipeIds[0]]?.title || 'món ăn';
+          }
+          
+          const displayRecipeName = recipeNames.length > 30 ? recipeNames.substring(0, 27) + '...' : recipeNames;
 
           const messages: Record<string, { title: string; body: string }> = {
             preparing: {
@@ -198,13 +213,13 @@ export default function OrderManager() {
   };
 
   const filteredOrders = orders.filter(o => {
-    const matchesFilter = filter === 'all' || o.status === filter;
-    const recipe = recipes[o.recipeId];
-    const kid = kidProfiles[o.kidId];
-    const matchesSearch = (kid?.name || o.kidId).toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          recipe?.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          o.id?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
+      const matchesFilter = filter === 'all' || o.status === filter;
+      const orderRecipeIds = o.recipeIds || (o.recipeId ? [o.recipeId] : []);
+      const kid = kidProfiles[o.kidId];
+      const matchesSearch = (kid?.name || o.kidId).toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            orderRecipeIds.some(id => recipes[id]?.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                            o.id?.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesFilter && matchesSearch;
   });
 
   // Group by date (today/tomorrow or week)
@@ -269,7 +284,7 @@ export default function OrderManager() {
                   <OrderCard 
                     key={order.id!} 
                     order={order} 
-                    recipe={recipes[order.recipeId]} 
+                    recipes={recipes} 
                     onUpdate={updateStatus} 
                     review={reviews[order.id!]}
                     kid={kidProfiles[order.kidId]}
@@ -287,13 +302,13 @@ export default function OrderManager() {
 interface OrderCardProps {
   key?: string;
   order: Order;
-  recipe?: Recipe;
+  recipes: Record<string, Recipe>;
   review?: Review;
   kid?: User;
   onUpdate: (id: string, s: OrderStatus) => Promise<void>;
 }
 
-function OrderCard({ order, recipe, review, kid, onUpdate }: OrderCardProps) {
+function OrderCard({ order, recipes, review, kid, onUpdate }: OrderCardProps) {
   const config = STATUS_CONFIG[order.status];
   const Icon = config.icon;
   const dayLabel = { mon: 'T2', tue: 'T3', wed: 'T4', thu: 'T5', fri: 'T6', sat: 'T7', sun: 'CN' }[order.day];
@@ -329,19 +344,31 @@ function OrderCard({ order, recipe, review, kid, onUpdate }: OrderCardProps) {
       </div>
 
       <div className="p-4 md:p-6 bg-secondary/30 flex flex-col gap-3 md:gap-4">
-        <div className="flex gap-3 md:gap-4">
-          <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl overflow-hidden bg-background shadow-sm flex-shrink-0">
-            {recipe?.imageUrl ? (
-              <img src={getOptimizedUrl(recipe.imageUrl, 200)} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground/30"><Utensils size={20} /></div>
-            )}
-          </div>
-          <div className="flex flex-col justify-center min-w-0">
-            <h4 className="font-bold text-foreground text-xs md:text-sm line-clamp-1 mb-0.5 md:mb-1 leading-tight">{recipe?.title || 'Đang tải...'}</h4>
-            <p className="text-[9px] md:text-[10px] text-muted-foreground font-medium tracking-tight">Cập nhật: {order.updatedAt ? format(order.updatedAt.toDate(), 'HH:mm', { locale: vi }) : '---'}</p>
-          </div>
-        </div>
+        {(() => {
+          const orderRecipeIds = order.recipeIds || (order.recipeId ? [order.recipeId] : []);
+          return orderRecipeIds.map((rid, idx) => {
+            const r = recipes[rid];
+            return (
+              <div key={rid + idx} className="flex gap-3 md:gap-4">
+                <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl overflow-hidden bg-background shadow-sm flex-shrink-0">
+                  {r?.imageUrl ? (
+                    <img src={getOptimizedUrl(r.imageUrl, 200)} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground/30"><Utensils size={20} /></div>
+                  )}
+                </div>
+                <div className="flex flex-col justify-center min-w-0">
+                  <h4 className="font-bold text-foreground text-xs md:text-sm line-clamp-1 mb-0.5 md:mb-1 leading-tight">{r?.title || 'Đang tải...'}</h4>
+                  <p className="text-[9px] md:text-[10px] text-muted-foreground font-medium tracking-tight">Món ăn cho bé</p>
+                </div>
+              </div>
+            );
+          });
+        })()}
+        
+        <p className="text-[9px] md:text-[10px] text-muted-foreground font-medium tracking-tight px-1">
+          Cập nhật: {order.updatedAt ? format(order.updatedAt.toDate(), 'HH:mm', { locale: vi }) : '---'}
+        </p>
 
         {review && (
           <div className="mt-2 p-4 bg-card rounded-2xl border border-border shadow-sm">

@@ -14,6 +14,7 @@ import {
   updateDoc,
   addDoc,
   onSnapshot,
+  documentId,
   Timestamp 
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -260,7 +261,7 @@ export default function KidsOrder() {
   const [weeklyMenu, setWeeklyMenu] = useState<WeeklyMenu | null>(null);
   const [recipes, setRecipes] = useState<Record<string, Recipe>>({});
   const [orders, setOrders] = useState<Record<string, Order>>({});
-  const [tempSelections, setTempSelections] = useState<Record<string, string>>({});
+  const [tempSelections, setTempSelections] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [configLoading, setConfigLoading] = useState(true);
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
@@ -376,6 +377,8 @@ export default function KidsOrder() {
       setOrders(orderMap);
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'orders'));
 
+    let unsubscribeRecipes: (() => void) | null = null;
+
     const fetchMenuAndRecipes = async () => {
       try {
         const menuRef = doc(db, 'weeklyMenu', weekId);
@@ -386,13 +389,19 @@ export default function KidsOrder() {
           setWeeklyMenu(menuData);
 
           const allIds = Array.from(new Set(Object.values(menuData.slots).flat())).filter(Boolean) as string[];
-          const recipeMap: Record<string, Recipe> = {};
           
-          await Promise.all(allIds.map(async (id) => {
-            const rDoc = await getDoc(doc(db, 'recipes', id));
-            if (rDoc.exists()) recipeMap[id] = { id: rDoc.id, ...rDoc.data() } as Recipe;
-          }));
-          setRecipes(recipeMap);
+          if (allIds.length > 0) {
+            const recipesQuery = query(collection(db, 'recipes'), where(documentId(), 'in', allIds));
+            unsubscribeRecipes = onSnapshot(recipesQuery, (snap) => {
+              const recipeMap: Record<string, Recipe> = {};
+              snap.docs.forEach(d => {
+                recipeMap[d.id] = { id: d.id, ...d.data() } as Recipe;
+              });
+              setRecipes(recipeMap);
+            }, (err) => handleFirestoreError(err, OperationType.LIST, 'recipes'));
+          } else {
+            setRecipes({});
+          }
         } else {
           setWeeklyMenu(null);
           setRecipes({});
@@ -405,31 +414,42 @@ export default function KidsOrder() {
     };
 
     fetchMenuAndRecipes();
-    return () => unsubscribeOrders();
+    return () => {
+      unsubscribeOrders();
+      if (unsubscribeRecipes) unsubscribeRecipes();
+    };
   }, [user, weekId]);
 
   const handleSelect = (day: string, recipeId: string) => {
     const order = orders[day];
-    // Only block selection if there's an active non-cancelled order that isn't pending
-    if (order && order.status !== 'cancelled') {
-      if (order.status !== 'pending') return;
-      setTempSelections(prev => ({ ...prev, [day]: recipeId }));
+    const isEditing = !!tempSelections[day];
+
+    // Only block selection if there's an active non-cancelled order and we aren't in editing mode
+    if (order && order.status !== 'cancelled' && !isEditing) {
       return;
     }
 
     setTempSelections(prev => {
-      if (prev[day] === recipeId) {
-        const next = { ...prev };
-        delete next[day];
-        return next;
+      const current = prev[day] || (order?.status !== 'cancelled' ? order?.recipeIds || (order?.recipeId ? [order.recipeId] : []) : []);
+      if (current.includes(recipeId)) {
+        const next = current.filter(id => id !== recipeId);
+        return { ...prev, [day]: next };
       }
-      return { ...prev, [day]: recipeId };
+      return { ...prev, [day]: [...current, recipeId] };
+    });
+  };
+
+  const handleCancelEditing = (day: string) => {
+    setTempSelections(prev => {
+      const next = { ...prev };
+      delete next[day];
+      return next;
     });
   };
 
   const handleConfirm = async (day: string) => {
-    const recipeId = tempSelections[day];
-    if (!user || !recipeId) return;
+    const recipeIds = tempSelections[day];
+    if (!user || !recipeIds || recipeIds.length === 0) return;
 
     setSubmitting(prev => ({ ...prev, [day]: true }));
     const loadingToast = toast.loading('Đang gửi...');
@@ -440,7 +460,8 @@ export default function KidsOrder() {
 
       if (order && order.status === 'pending') {
         await updateDoc(doc(db, 'orders', order.id!), {
-          recipeId,
+          recipeIds,
+          recipeId: recipeIds[0], // Keep for backward compatibility
           status: 'pending',
           updatedAt: now
         });
@@ -450,7 +471,8 @@ export default function KidsOrder() {
           kidId: user.userId,
           weekId,
           day: day as any,
-          recipeId,
+          recipeId: recipeIds[0], // Keep for backward compatibility
+          recipeIds,
           status: 'pending',
           createdAt: now,
           updatedAt: now
@@ -618,12 +640,19 @@ export default function KidsOrder() {
 
                 const slotRecipes = weeklyMenu.slots[day.key as keyof WeeklyMenu['slots']] || [];
                 const order = orders[day.key];
+                const orderRecipeIds = order?.recipeIds || (order?.recipeId ? [order.recipeId] : []);
                 const tempSelection = tempSelections[day.key];
                 const isConfirmed = order && order.status !== 'cancelled';
                 const isPending = order?.status === 'pending';
-                const isLocked = (isConfirmed && !isPending) || isDateLocked;
                 const isEditing = !!tempSelection;
-                const hasChanges = isEditing && (tempSelection !== order?.recipeId || order?.status === 'cancelled');
+                const isLocked = (isConfirmed && !isPending) || isDateLocked || (isConfirmed && !isEditing);
+                
+                // Compare arrays
+                const hasChanges = isEditing && (
+                  tempSelection.length !== orderRecipeIds.length || 
+                  !tempSelection.every(id => orderRecipeIds.includes(id)) || 
+                  order?.status === 'cancelled'
+                );
 
                 if (slotRecipes.length === 0) {
                   return (
@@ -641,8 +670,8 @@ export default function KidsOrder() {
                         const recipe = recipes[recipeId];
                         if (!recipe) return null;
                         
-                        const isMealConfirmed = order?.recipeId === recipeId && order.status !== 'cancelled';
-                        const isMealSelected = tempSelection === recipeId;
+                        const isMealConfirmed = orderRecipeIds.includes(recipeId) && order?.status !== 'cancelled';
+                        const isMealSelected = tempSelection?.includes(recipeId);
 
                         return (
                           <MealCard
@@ -665,27 +694,29 @@ export default function KidsOrder() {
                     </div>
 
                     {/* Action Row for Mobile Pending Order */}
-                    {order && order.status === 'pending' && !isEditing && (
-                      <div className="flex items-center justify-center gap-3 pt-3">
-                        {slotRecipes.length > 1 && (
-                          <>
-                            <button 
-                              onClick={() => setTempSelections(prev => ({ ...prev, [day.key]: order.recipeId }))}
-                              className="text-[13px] font-medium text-primary bg-none border-none p-0 cursor-pointer"
-                            >
-                              Thay đổi món
-                            </button>
-                            <span className="text-[13px] text-muted-foreground/30">·</span>
-                          </>
-                        )}
-                        <button 
-                          onClick={() => handleCancel(day.key)}
-                          className="text-[13px] font-medium text-destructive bg-none border-none p-0 cursor-pointer"
+                    <AnimatePresence>
+                      {order && order.status === 'pending' && !isEditing && (
+                        <motion.div 
+                          initial={{ y: 100, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          exit={{ y: 100, opacity: 0 }}
+                          className="fixed bottom-[86px] left-4 right-4 flex flex-row gap-2 z-40"
                         >
-                          Huỷ đặt món
-                        </button>
-                      </div>
-                    )}
+                          <button 
+                            onClick={() => setTempSelections(prev => ({ ...prev, [day.key]: orderRecipeIds }))}
+                            className="flex-1 h-[52px] bg-primary text-primary-foreground font-semibold rounded-[14px] shadow-xl flex items-center justify-center gap-2 text-[15px] transition-all"
+                          >
+                            Thay đổi món
+                          </button>
+                          <button 
+                            onClick={() => handleCancel(day.key)}
+                            className="flex-1 h-[52px] bg-card text-destructive font-semibold rounded-[14px] shadow-lg border border-destructive/20 flex items-center justify-center text-[15px] active:scale-95 transition-all"
+                          >
+                            Huỷ đặt món
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     {/* Status Pills for Locked Status - Mobile */}
                     {isConfirmed && !isPending && (
@@ -712,22 +743,37 @@ export default function KidsOrder() {
                     )}
 
                     <AnimatePresence>
-                      {hasChanges && (
-                        <motion.button 
-                          initial={{ y: 100, opacity: 0 }}
-                          animate={{ y: 0, opacity: 1 }}
-                          exit={{ y: 100, opacity: 0 }}
-                          onClick={() => handleConfirm(day.key)}
-                          disabled={submitting[day.key]}
-                          className="fixed bottom-[86px] left-4 right-4 h-[52px] bg-primary text-primary-foreground font-semibold rounded-[14px] shadow-xl z-40 flex items-center justify-center gap-2 text-[15px]"
-                        >
-                          {submitting[day.key] ? <Loader2 size={20} className="animate-spin" /> : (
-                            <div className="flex items-center gap-2">
-                              Xác nhận đặt món
-                              <CircleCheckBig size={20} />
-                            </div>
-                          )}
-                        </motion.button>
+                      {isEditing && (
+                          <motion.div 
+                            initial={{ y: 100, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: 100, opacity: 0 }}
+                            className="fixed bottom-[86px] left-4 right-4 flex flex-row gap-2 z-40"
+                          >
+                            <button 
+                              onClick={() => handleConfirm(day.key)}
+                              disabled={submitting[day.key] || !hasChanges}
+                              className={`flex-1 h-[52px] font-semibold rounded-[14px] shadow-xl flex items-center justify-center gap-2 text-[15px] transition-all ${
+                                hasChanges 
+                                ? 'bg-primary text-primary-foreground' 
+                                : 'bg-muted text-muted-foreground opacity-50 cursor-not-allowed'
+                              }`}
+                            >
+                              {submitting[day.key] ? <Loader2 size={20} className="animate-spin" /> : (
+                                <div className="flex items-center gap-2">
+                                  {order?.status === 'cancelled' || !order ? 'Đặt món' : 'Xác nhận'}
+                                  <CircleCheckBig size={18} />
+                                </div>
+                              )}
+                            </button>
+                            <button 
+                              onClick={() => handleCancelEditing(day.key)}
+                              disabled={submitting[day.key]}
+                              className="flex-1 h-[52px] bg-card text-foreground font-semibold rounded-[14px] shadow-lg border border-border flex items-center justify-center text-[15px] active:scale-95 transition-all"
+                            >
+                              Hủy bỏ
+                            </button>
+                          </motion.div>
                       )}
                     </AnimatePresence>
                   </div>
@@ -753,12 +799,18 @@ export default function KidsOrder() {
 
               const slotRecipes = weeklyMenu.slots[day.key as keyof WeeklyMenu['slots']] || [];
               const order = orders[day.key];
+              const orderRecipeIds = order?.recipeIds || (order?.recipeId ? [order.recipeId] : []);
               const tempSelection = tempSelections[day.key];
               const isConfirmed = order && order.status !== 'cancelled';
               const isPending = order?.status === 'pending';
-              const isLocked = (isConfirmed && !isPending) || isDateLocked;
               const isEditing = !!tempSelection;
-              const hasChanges = isEditing && (tempSelection !== order?.recipeId || order?.status === 'cancelled');
+              const isLocked = (isConfirmed && !isPending) || isDateLocked || (isConfirmed && !isEditing);
+              
+              const hasChanges = isEditing && (
+                tempSelection.length !== orderRecipeIds.length || 
+                !tempSelection.every(id => orderRecipeIds.includes(id)) || 
+                order?.status === 'cancelled'
+              );
 
               return (
                 <div key={day.key} className={`flex flex-col gap-3 ${isDateLocked ? 'opacity-60' : ''}`}>
@@ -793,8 +845,8 @@ export default function KidsOrder() {
                         const recipe = recipes[recipeId];
                         if (!recipe) return null;
                         
-                        const isMealConfirmed = order?.recipeId === recipeId && order.status !== 'cancelled';
-                        const isMealSelected = tempSelection === recipeId;
+                        const isMealConfirmed = orderRecipeIds.includes(recipeId) && order?.status !== 'cancelled';
+                        const isMealSelected = tempSelection?.includes(recipeId);
                         const showCheckmark = !isEditing && isMealConfirmed;
                         const isDimmed = isLocked && !isMealConfirmed;
 
@@ -823,39 +875,46 @@ export default function KidsOrder() {
 
                     <div className="mt-1">
                       <AnimatePresence>
-                        {hasChanges && (
-                          <motion.button 
+                        {isEditing && (
+                          <motion.div 
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            onClick={() => handleConfirm(day.key)}
-                            disabled={submitting[day.key]}
-                            className="w-full py-3.5 bg-primary hover:opacity-90 text-primary-foreground font-black rounded-xl shadow-lg shadow-primary-shadow/30 transition-all flex items-center justify-center gap-2"
+                            className="flex flex-row gap-2 mb-3"
                           >
-                            {submitting[day.key] ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                            <span className="text-[11px] uppercase tracking-[0.1em]">Xác nhận đặt món</span>
-                          </motion.button>
+                            <button 
+                              onClick={() => handleConfirm(day.key)}
+                              disabled={submitting[day.key] || !hasChanges}
+                              className={`flex-1 py-3 bg-primary hover:opacity-90 text-primary-foreground font-bold rounded-xl shadow-lg shadow-primary-shadow/30 transition-all flex items-center justify-center gap-1.5 ${!hasChanges && 'opacity-50 cursor-not-allowed'}`}
+                            >
+                              {submitting[day.key] ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                              <span className="text-[10px] uppercase tracking-wider">Xác nhận</span>
+                            </button>
+                            <button 
+                              onClick={() => handleCancelEditing(day.key)}
+                              disabled={submitting[day.key]}
+                              className="flex-1 py-3 bg-card hover:bg-secondary text-foreground border border-border font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wider"
+                            >
+                              Hủy bỏ
+                            </button>
+                          </motion.div>
                         )}
                       </AnimatePresence>
 
                       {order && order.status === 'pending' && !isEditing && (
-                        <div className={`flex items-center py-1 px-1 ${slotRecipes.length > 1 ? 'justify-between' : 'justify-center'}`}>
-                          {slotRecipes.length > 1 && (
-                            <>
-                              <button 
-                                onClick={() => setTempSelections(prev => ({ ...prev, [day.key]: order.recipeId }))}
-                                className="text-[11px] font-bold text-primary hover:underline uppercase tracking-wider"
-                              >
-                                Thay đổi món
-                              </button>
-                              <button 
-                                onClick={() => handleCancel(day.key)}
-                                className="text-[11px] font-bold text-destructive hover:underline uppercase tracking-wider"
-                              >
-                                Huỷ đặt món
-                              </button>
-                            </>
-                          )}
+                        <div className="flex flex-row gap-2 pt-4">
+                          <button 
+                            onClick={() => setTempSelections(prev => ({ ...prev, [day.key]: orderRecipeIds }))}
+                            className="flex-1 h-11 bg-primary text-primary-foreground font-bold rounded-xl shadow-md transition-all flex items-center justify-center text-[11px] uppercase tracking-wider"
+                          >
+                            Thay đổi món
+                          </button>
+                          <button 
+                            onClick={() => handleCancel(day.key)}
+                            className="flex-1 h-11 bg-card text-destructive border border-destructive/20 font-bold rounded-xl transition-all flex items-center justify-center text-[11px] uppercase tracking-wider"
+                          >
+                            Huỷ đặt món
+                          </button>
                         </div>
                       )}
                     </div>
@@ -882,7 +941,7 @@ export default function KidsOrder() {
         title="Huỷ đặt món?"
         message={
           cancelModal.day 
-            ? `Bé có chắc muốn huỷ món "${recipes[orders[cancelModal.day]?.recipeId]?.title}" ngày ${ALL_DAYS.find(d => d.key === cancelModal.day)?.label} không?`
+            ? `Bé có chắc muốn huỷ món ngày ${ALL_DAYS.find(d => d.key === cancelModal.day)?.label} không?`
             : "Bé có chắc muốn huỷ món này không?"
         }
         confirmText="Huỷ đặt món"

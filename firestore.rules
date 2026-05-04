@@ -75,11 +75,12 @@ service cloud.firestore {
 
     // --- Order Validation ---
     function isValidOrder(data) {
-      return data.keys().hasAll(['kidId', 'weekId', 'day', 'recipeId', 'status', 'createdAt', 'updatedAt'])
+      return data.keys().hasAll(['kidId', 'weekId', 'day', 'recipeId', 'recipeIds', 'status', 'createdAt', 'updatedAt'])
         && data.kidId is string && isValidId(data.kidId)
         && data.weekId is string && data.weekId.size() <= 20
         && data.day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
         && data.recipeId is string && isValidId(data.recipeId)
+        && data.recipeIds is list && data.recipeIds.size() > 0 && data.recipeIds.size() <= 10
         && data.status in ['pending', 'preparing', 'ready', 'on_the_way', 'arrived', 'done', 'cancelled']
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
@@ -92,7 +93,7 @@ service cloud.firestore {
         // Only allow status updates or recipe updates if pending or cancelled
         (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
         ((existing().status == 'pending' || existing().status == 'cancelled') && 
-         incoming().diff(existing()).affectedKeys().hasOnly(['recipeId', 'status', 'updatedAt'])))
+         incoming().diff(existing()).affectedKeys().hasOnly(['recipeId', 'recipeIds', 'status', 'updatedAt'])))
       );
       allow delete: if existing().status == 'pending';
     }

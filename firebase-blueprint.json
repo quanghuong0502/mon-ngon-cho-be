@@ -73,17 +73,10 @@
       "properties": {
         "kidId": { "type": "string" },
         "weekId": { "type": "string" },
-        "meals": {
-          "type": "object",
-          "properties": {
-            "mon": { "type": "array", "items": { "type": "string" } },
-            "tue": { "type": "array", "items": { "type": "string" } },
-            "wed": { "type": "array", "items": { "type": "string" } },
-            "thu": { "type": "array", "items": { "type": "string" } },
-            "fri": { "type": "array", "items": { "type": "string" } }
-          }
-        },
-        "status": { "type": "string", "enum": ["pending", "preparing", "ready", "done"] },
+        "day": { "type": "string", "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] },
+        "recipeId": { "type": "string" },
+        "recipeIds": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["pending", "preparing", "ready", "on_the_way", "arrived", "done", "cancelled"] },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
