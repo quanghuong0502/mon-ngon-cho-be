@@ -50,12 +50,26 @@ export default function ReviewHistory() {
 
       // Fetch missing data
       const kidIds = Array.from(new Set(loadedReviews.map(r => r.authorId))).filter(Boolean);
-      const recipeIds = Array.from(new Set(loadedReviews.map(r => r.recipeId))).filter(Boolean);
       const orderIds = Array.from(new Set(loadedReviews.map(r => r.orderId))).filter(id => !!id) as string[];
 
       const userMap = { ...kidProfiles };
       const recipeMap = { ...recipes };
       const orderMap = { ...reviewOrders };
+
+      const recipeIdsSet = new Set<string>();
+      loadedReviews.forEach(r => {
+        if (r.recipeId) recipeIdsSet.add(r.recipeId);
+      });
+      // Also add recipeIds from the orders themselves
+      orderIds.forEach(oid => {
+        const order = orderMap[oid];
+        if (order?.recipeIds) {
+          order.recipeIds.forEach(id => recipeIdsSet.add(id));
+        } else if (order?.recipeId) {
+          recipeIdsSet.add(order.recipeId);
+        }
+      });
+      const recipeIds = Array.from(recipeIdsSet);
 
       await Promise.all([
         ...kidIds.map(async (id) => {
@@ -160,8 +174,11 @@ export default function ReviewHistory() {
           ) : (
             filteredReviews.map((review) => {
               const kid = kidProfiles[review.authorId];
-              const recipe = recipes[review.recipeId];
               const order = review.orderId ? reviewOrders[review.orderId] : null;
+              const recipe = review.recipeId ? recipes[review.recipeId] : null;
+              
+              const orderRecipeIds = order?.recipeIds || (order?.recipeId ? [order.recipeId] : []);
+              const displayRecipes = recipe ? [recipe] : orderRecipeIds.map(id => recipes[id]).filter(Boolean);
               
               const DAY_NAMES = { mon: 'Thứ Hai', tue: 'Thứ Ba', wed: 'Thứ Tư', thu: 'Thứ Năm', fri: 'Thứ Sáu' };
               const dayLabel = order ? DAY_NAMES[order.day] : '';
@@ -175,9 +192,15 @@ export default function ReviewHistory() {
                   className="bg-card p-4 md:p-5 rounded-[24px] md:rounded-2xl border border-border/50 hover:border-primary/30 transition-all flex flex-col md:flex-row gap-4 md:gap-5 shadow-sm"
                 >
                   <div className="flex items-start gap-4 flex-1 min-w-0">
-                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl overflow-hidden bg-secondary shrink-0 border border-border shadow-sm">
-                      {recipe?.imageUrl || recipe?.thumbnailUrl ? (
-                        <img src={getOptimizedUrl(recipe.thumbnailUrl || recipe.imageUrl, 200)} className="w-full h-full object-cover" />
+                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl overflow-hidden bg-secondary shrink-0 border border-border shadow-sm flex flex-wrap">
+                      {displayRecipes.length > 0 ? (
+                        displayRecipes.slice(0, 4).map((r, i) => (
+                          <img 
+                            key={r.id || i} 
+                            src={getOptimizedUrl(r.thumbnailUrl || r.imageUrl, 200)} 
+                            className={`object-cover ${displayRecipes.length > 1 ? 'w-1/2 h-1/2' : 'w-full h-full'}`} 
+                          />
+                        ))
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-muted-foreground/30">
                           <Utensils size={20} />
@@ -213,7 +236,11 @@ export default function ReviewHistory() {
                       </div>
 
                       <div className="mb-3">
-                        <p className="text-[13px] md:text-sm text-foreground font-bold mb-0.5 line-clamp-1">{recipe?.title || 'Đang tải...'}</p>
+                        <p className="text-[13px] md:text-sm text-foreground font-bold mb-0.5 line-clamp-1">
+                          {displayRecipes.length > 0 
+                            ? displayRecipes.map(r => r.title).join(', ')
+                            : 'Món ăn không tồn tại'}
+                        </p>
                         {order && (
                           <p className="text-[10px] md:text-xs text-muted-foreground font-semibold flex items-center gap-1.5 bg-secondary/50 w-fit px-2 py-0.5 rounded-lg">
                             {dayLabel} {weekNum ? `· Tuần ${weekNum}` : ''}

@@ -942,7 +942,7 @@ export default function KidsHome() {
                       </div>
                       {meal.favoriteCount !== undefined && (
                         <div className="flex items-center gap-1">
-                          <Heart size={10} className="fill-destructive text-destructive" />
+                          <Heart size={12} className="fill-destructive text-destructive" />
                           <span className="text-[10px] font-bold text-muted-foreground">{meal.favoriteCount}</span>
                         </div>
                       )}

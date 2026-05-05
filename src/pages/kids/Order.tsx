@@ -146,7 +146,7 @@ const MealCard = memo(({
             isActive 
               ? 'border-primary bg-primary/5' 
               : 'border-border'
-          } ${isVisualLocked && !isActive ? 'opacity-40 grayscale cursor-not-allowed' : ''}`}
+          } ${isSelectionDisabled && !isActive ? 'opacity-40 grayscale cursor-not-allowed' : 'opacity-100 cursor-pointer'}`}
         >
           <div className="h-[160px] w-full relative">
             {recipe.imageUrl ? (
@@ -205,7 +205,7 @@ const MealCard = memo(({
         isActive 
           ? 'bg-primary/5 border-primary shadow-lg shadow-primary-shadow/50' 
           : 'bg-card border-border shadow-sm hover:border-primary/50'
-      } ${isVisualLocked && !isActive ? 'opacity-40 grayscale cursor-not-allowed' : 'opacity-100 cursor-pointer'}`}
+      } ${isSelectionDisabled && !isActive ? 'opacity-40 grayscale cursor-not-allowed' : 'opacity-100 cursor-pointer'}`}
     >
       <div className="h-[120px] w-full bg-secondary relative group-hover:brightness-95 transition-all">
         {recipe.imageUrl ? (
@@ -293,14 +293,34 @@ export default function KidsOrder() {
   const [submitting, setSubmitting] = useState<Record<string, boolean>>({});
   const [servingDays, setServingDays] = useState<string[]>(['mon', 'tue', 'wed', 'thu', 'fri']);
   const [kitchenConfig, setKitchenConfig] = useState<any>(null);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>('');
   const hasInitializedTab = React.useRef(false);
-  const [cancelModal, setCancelModal] = useState<{ isOpen: boolean; day: string | null }>({
+  const [cancelModal, setCancelModal] = useState<{ 
+    isOpen: boolean; 
+    day: string | null;
+    reason: string;
+  }>({
     isOpen: false,
-    day: null
+    day: null,
+    reason: ''
   });
+
+  // Auto-scroll to top when order IDs change (after save)
+  useEffect(() => {
+    if (Object.keys(orders).length > 0 && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [JSON.stringify(Object.values(orders).map((o: Order) => o.recipeIds?.join(',')))]);
+
+  // Auto-scroll to top when day changes
+  useEffect(() => {
+    if (scrollContainerRef.current && hasInitializedTab.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [selectedDay]);
 
   const activeDays = ALL_DAYS.filter(d => servingDays.includes(d.key));
 
@@ -378,37 +398,41 @@ export default function KidsOrder() {
   }, []);
 
   useEffect(() => {
-    if (servingDays.length > 0 && !hasInitializedTab.current) {
-      const getTomorrowTab = () => {
-        const tomorrow = addDays(new Date(), 1);
-        const day = tomorrow.getDay(); // 0=Sun, 1=Mon...6=Sat
-        const dayMap: Record<number, string> = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat', 0: 'sun' };
-        const tomorrowKey = dayMap[day];
+    if (servingDays.length > 0 && !hasInitializedTab.current && !configLoading) {
+      const getDefaultTab = () => {
+        const today = startOfDay(new Date());
+        // Map 0 (Sun) to index 6, 1-6 to 0-5
+        const dayIdx = today.getDay() === 0 ? 6 : today.getDay() - 1;
+        const todayKey = ALL_DAYS[dayIdx].key;
         
-        // Find if tomorrow is a serving day
-        if (servingDays.includes(tomorrowKey)) return tomorrowKey;
+        // If today is a serving day and NOT locked, default to today
+        if (servingDays.includes(todayKey)) {
+          const { isDateLocked: isTodayLocked } = getDayLockStatus(todayKey);
+          if (!isTodayLocked) return todayKey;
+        }
+
+        // Otherwise find tomorrow or next available serving day
+        const tomorrow = addDays(today, 1);
+        const tomorrowDayIdx = tomorrow.getDay() === 0 ? 6 : tomorrow.getDay() - 1;
+        const tomorrowKey = ALL_DAYS[tomorrowDayIdx].key;
         
-        // Find next available serving day from tomorrow
         const dayOrder = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
         const startIndex = dayOrder.indexOf(tomorrowKey);
         
-        // Check remaining days of the current week (from tomorrow)
-        for (let i = startIndex; i < dayOrder.length; i++) {
-          if (servingDays.includes(dayOrder[i])) return dayOrder[i];
-        }
-        
-        // Check from beginning of week
-        for (let i = 0; i < startIndex; i++) {
-          if (servingDays.includes(dayOrder[i])) return dayOrder[i];
+        // Cycle through 7 days starting from tomorrow
+        for (let i = 0; i < 7; i++) {
+          const checkIdx = (startIndex + i) % 7;
+          const checkKey = dayOrder[checkIdx];
+          if (servingDays.includes(checkKey)) return checkKey;
         }
         
         return servingDays[0];
       };
 
-      setSelectedDay(getTomorrowTab());
+      setSelectedDay(getDefaultTab());
       hasInitializedTab.current = true;
     }
-  }, [servingDays]);
+  }, [servingDays, configLoading, currentWeekStart]);
 
   const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
     const errInfo: FirestoreErrorInfo = {
@@ -563,7 +587,7 @@ export default function KidsOrder() {
   const handleConfirm = async (day: string) => {
     const { isDateLocked } = getDayLockStatus(day);
     if (isDateLocked) {
-      toast.error('Hiện tại không trong thời gian đặt món cho ngày này.', { id: 'lock-error' });
+      toast.error('Hiện tại ngoài thời gian đặt món!', { id: 'lock-error' });
       return;
     }
 
@@ -578,14 +602,34 @@ export default function KidsOrder() {
       const now = Timestamp.now();
 
       if (order && order.status === 'pending') {
+        const newItemAddedAt = { ...(order.itemAddedAt || {}) };
+        recipeIds.forEach(id => {
+          if (!newItemAddedAt[id]) {
+            newItemAddedAt[id] = now;
+          }
+        });
+        
+        // Remove timestamps for items that were removed
+        Object.keys(newItemAddedAt).forEach(id => {
+          if (!recipeIds.includes(id)) {
+            delete newItemAddedAt[id];
+          }
+        });
+
         await updateDoc(doc(db, 'orders', order.id!), {
           recipeIds,
           recipeId: recipeIds[0], // Keep for backward compatibility
           status: 'pending',
-          updatedAt: now
+          updatedAt: now,
+          itemAddedAt: newItemAddedAt
         });
         toast.success(`Đã cập nhật món cho ${ALL_DAYS.find(d => d.key === day)?.label}!`, { id: loadingToast });
       } else {
+        const initialItemAddedAt: Record<string, any> = {};
+        recipeIds.forEach(id => {
+          initialItemAddedAt[id] = now;
+        });
+
         const orderData: Omit<Order, 'id'> = {
           kidId: user.userId,
           weekId,
@@ -594,7 +638,8 @@ export default function KidsOrder() {
           recipeIds,
           status: 'pending',
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
+          itemAddedAt: initialItemAddedAt
         };
         await addDoc(collection(db, 'orders'), orderData);
         toast.success('Đặt món thành công!', { id: loadingToast });
@@ -613,17 +658,22 @@ export default function KidsOrder() {
   };
 
   const handleCancel = async (day: string) => {
-    setCancelModal({ isOpen: true, day });
+    setCancelModal({ isOpen: true, day, reason: '' });
   };
 
   const executeCancel = async () => {
     const day = cancelModal.day;
     if (!day) return;
+
+    if (!cancelModal.reason.trim()) {
+      toast.error('Bé hãy cho bếp biết lý do bé muốn huỷ món nhé!');
+      return;
+    }
     
     const { isDateLocked } = getDayLockStatus(day);
     if (isDateLocked) {
-      toast.error('Đã quá thời gian để huỷ món cho ngày này.');
-      setCancelModal({ isOpen: false, day: null });
+      toast.error('Ngoài thời gian huỷ món!');
+      setCancelModal({ isOpen: false, day: null, reason: '' });
       return;
     }
 
@@ -636,9 +686,11 @@ export default function KidsOrder() {
     try {
       await updateDoc(doc(db, 'orders', order.id!), {
         status: 'cancelled',
+        cancelReason: cancelModal.reason.trim(),
         updatedAt: Timestamp.now()
       });
       toast.success(`Đã huỷ đặt món ${dayLabel}`, { id: loadingToast });
+      setCancelModal({ isOpen: false, day: null, reason: '' });
     } catch (err) {
       console.error('Cancel error:', err);
       toast.error('Có lỗi xảy ra, bé thử lại nhé!', { id: loadingToast });
@@ -677,7 +729,7 @@ export default function KidsOrder() {
   return (
     <div className="flex flex-col h-full bg-transparent relative">
       {/* Scrollable area */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scroll-smooth" ref={scrollContainerRef}>
         <div className="max-w-7xl mx-auto">
           {/* Title + subtitle - non-sticky, scrolls */}
           <div className="px-4 md:px-6 pt-4 pb-2">
@@ -688,9 +740,9 @@ export default function KidsOrder() {
           </div>
 
           {/* Sticky Week Badge for Mobile */}
-          <div className="sticky top-0 z-[29] bg-background px-2 pt-2 pb-4 md:hidden flex justify-center">
+          <div className="sticky top-0 z-[100] bg-background px-2 pt-5 pb-4 md:hidden flex justify-center">
             <div className="inline-flex items-center gap-3 bg-card px-4 py-2 rounded-2xl shadow-sm border border-border">
-              <span className="bg-primary text-primary-foreground font-black text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-lg">
+              <span className="bg-primary text-primary-foreground font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full">
                 TUẦN {weekId.split('-')[1]}
               </span>
               <span className="text-muted-foreground text-xs font-black tracking-tight uppercase">
@@ -700,7 +752,7 @@ export default function KidsOrder() {
           </div>
 
           {/* Sticky Day Tab Bar for Mobile - Sticks below Week Badge */}
-          <div className="sticky top-[60px] z-30 bg-background border-b border-border px-4 pt-4 pb-4 md:hidden overflow-x-auto scrollbar-hide flex justify-center gap-3 no-scrollbar">
+          <div className="sticky top-[72px] z-100 bg-background border-b border-border px-4 pt-4 pb-4 md:hidden overflow-x-auto scrollbar-hide flex justify-center gap-3 no-scrollbar">
             <style dangerouslySetInnerHTML={{ __html: `
               .no-scrollbar::-webkit-scrollbar { display: none; }
               .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -794,39 +846,46 @@ export default function KidsOrder() {
                           <Lock size={18} className="text-destructive" />
                         </div>
                         <div className="space-y-0.5">
-                          <p className="text-sm font-bold text-destructive">Đã hết giờ đặt món</p>
+                          <p className="text-sm font-bold text-destructive">Ngoài giờ đặt món</p>
                           <p className="text-[11px] text-destructive/70 leading-relaxed font-medium">Bé có thể xem lại món đã đặt nhưng không thể thay đổi.</p>
                         </div>
                       </div>
                     )}
 
                     <div className="flex flex-col gap-3">
-                      {slotRecipes.map(recipeId => {
-                        const recipe = recipes[recipeId];
-                        if (!recipe) return null;
-                        
-                        const isMealConfirmed = orderRecipeIds.includes(recipeId) && order?.status !== 'cancelled';
-                        const isMealSelected = tempSelection?.includes(recipeId);
+                      {[...slotRecipes]
+                        .sort((a, b) => {
+                          const aSelected = orderRecipeIds.includes(a);
+                          const bSelected = orderRecipeIds.includes(b);
+                          if (aSelected && !bSelected) return -1;
+                          if (!aSelected && bSelected) return 1;
+                          return 0;
+                        })
+                        .map(recipeId => {
+                          const recipe = recipes[recipeId];
+                          if (!recipe) return null;
+                          
+                          const isMealConfirmed = orderRecipeIds.includes(recipeId) && order?.status !== 'cancelled';
+                          const isMealSelected = tempSelection?.includes(recipeId);
 
-                        return (
-                          <MealCard
-                            key={recipeId}
-                            recipe={recipe}
-                            isVisualLocked={isVisualLocked}
-                            isSelectionDisabled={isSelectionDisabled}
-                            handleSelect={handleSelect}
-                            dayKey={day.key}
-                            isEditing={isEditing}
-                            isMealSelected={isMealSelected}
-                            isMealConfirmed={isMealConfirmed}
-                            showCheckmark={!isEditing && isMealConfirmed}
-                            isDimmed={isVisualLocked && !isMealConfirmed}
-                            onInfoClick={setSelectedRecipe}
-                            variant="mobile"
-                          />
-                        );
-                      })}
-
+                          return (
+                            <MealCard
+                              key={recipeId}
+                              recipe={recipe}
+                              isVisualLocked={isVisualLocked}
+                              isSelectionDisabled={isSelectionDisabled}
+                              handleSelect={handleSelect}
+                              dayKey={day.key}
+                              isEditing={isEditing}
+                              isMealSelected={isMealSelected}
+                              isMealConfirmed={isMealConfirmed}
+                              showCheckmark={!isEditing && isMealConfirmed}
+                              isDimmed={isVisualLocked && !isMealConfirmed}
+                              onInfoClick={setSelectedRecipe}
+                              variant="mobile"
+                            />
+                          );
+                        })}
                     </div>
 
                     {/* Action Row for Mobile Pending Order */}
@@ -855,14 +914,6 @@ export default function KidsOrder() {
                     </AnimatePresence>
 
                     {/* Status Pills for Locked Status - Mobile */}
-                    {isTomorrow && isDateLocked && !isConfirmed && (
-                      <div className="flex justify-center pt-3">
-                        <div className="bg-destructive/10 text-destructive px-4 py-1.5 rounded-full text-[13px] font-medium border border-destructive/20 flex items-center gap-2">
-                           <Info size={12} />
-                           Đã hết giờ đặt món cho ngày mai ({windowInfo?.start} - {windowInfo?.end})
-                        </div>
-                      </div>
-                    )}
                     {isConfirmed && !isPending && (
                       <div className="flex justify-center pt-3">
                         {order.status === 'preparing' && (
@@ -1001,32 +1052,40 @@ export default function KidsOrder() {
 
                   <div className="flex flex-col gap-3">
                     {slotRecipes.length > 0 ? (
-                      slotRecipes.map(recipeId => {
-                        const recipe = recipes[recipeId];
-                        if (!recipe) return null;
-                        
-                        const isMealConfirmed = orderRecipeIds.includes(recipeId) && order?.status !== 'cancelled';
-                        const isMealSelected = tempSelection?.includes(recipeId);
-                        const showCheckmark = !isEditing && isMealConfirmed;
-                        const isDimmed = isVisualLocked && !isMealConfirmed;
+                      [...slotRecipes]
+                        .sort((a, b) => {
+                          const aSelected = orderRecipeIds.includes(a);
+                          const bSelected = orderRecipeIds.includes(b);
+                          if (aSelected && !bSelected) return -1;
+                          if (!aSelected && bSelected) return 1;
+                          return 0;
+                        })
+                        .map(recipeId => {
+                          const recipe = recipes[recipeId];
+                          if (!recipe) return null;
+                          
+                          const isMealConfirmed = orderRecipeIds.includes(recipeId) && order?.status !== 'cancelled';
+                          const isMealSelected = tempSelection?.includes(recipeId);
+                          const showCheckmark = !isEditing && isMealConfirmed;
+                          const isDimmed = isVisualLocked && !isMealConfirmed;
 
-                        return (
-                          <MealCard
-                            key={recipeId}
-                            recipe={recipe}
-                            isVisualLocked={isVisualLocked}
-                            isSelectionDisabled={isSelectionDisabled}
-                            handleSelect={handleSelect}
-                            dayKey={day.key}
-                            isEditing={isEditing}
-                            isMealSelected={isMealSelected}
-                            isMealConfirmed={isMealConfirmed}
-                            showCheckmark={showCheckmark}
-                            isDimmed={isDimmed}
-                            onInfoClick={setSelectedRecipe}
-                          />
-                        );
-                      })
+                          return (
+                            <MealCard
+                              key={recipeId}
+                              recipe={recipe}
+                              isVisualLocked={isVisualLocked}
+                              isSelectionDisabled={isSelectionDisabled}
+                              handleSelect={handleSelect}
+                              dayKey={day.key}
+                              isEditing={isEditing}
+                              isMealSelected={isMealSelected}
+                              isMealConfirmed={isMealConfirmed}
+                              showCheckmark={showCheckmark}
+                              isDimmed={isDimmed}
+                              onInfoClick={setSelectedRecipe}
+                            />
+                          );
+                        })
                     ) : (
                       <div className="h-[100px] rounded-2xl border-2 border-dashed border-border bg-secondary flex flex-col items-center justify-center p-4 text-center">
                         <UtensilsCrossed size={20} className="text-muted-foreground/30 mb-1" />
@@ -1096,19 +1155,25 @@ export default function KidsOrder() {
 
       <ConfirmModal
         isOpen={cancelModal.isOpen}
-        onClose={() => setCancelModal({ isOpen: false, day: null })}
+        onClose={() => setCancelModal({ isOpen: false, day: null, reason: '' })}
         onConfirm={executeCancel}
         icon={<Trash2 size={24} className="text-destructive" />}
         title="Huỷ đặt món?"
-        message={
-          cancelModal.day 
-            ? `Bé có chắc muốn huỷ món ngày ${ALL_DAYS.find(d => d.key === cancelModal.day)?.label} không?`
-            : "Bé có chắc muốn huỷ món này không?"
-        }
         confirmText="Huỷ đặt món"
         cancelText="Giữ lại món này"
-        confirmStyle="danger"
-      />
+        confirmStyle="primary"
+        confirmDisabled={!cancelModal.reason.trim()}
+      >
+        <div className="w-full space-y-2">
+          <label className="block mb-3 text-[13px] font-bold text-muted-foreground tracking-wider ml-1">Lý do bé huỷ món là gì? * </label>
+          <textarea
+            value={cancelModal.reason}
+            onChange={(e) => setCancelModal(prev => ({ ...prev, reason: e.target.value }))}
+            placeholder="Ví dụ: Bé muốn đổi sang món khác, Bé không ăn trưa tại trường..."
+            className="w-full min-h-[80px] p-4 bg-secondary border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+          />
+        </div>
+      </ConfirmModal>
     </div>
   );
 }

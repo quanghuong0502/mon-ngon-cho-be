@@ -20,35 +20,43 @@ service cloud.firestore {
 
     // --- User Validation ---
     function isValidUser(data) {
-      return data.keys().hasAll(['username', 'password', 'role', 'name', 'createdAt'])
-        && data.username is string && data.username.size() > 0 && data.username.size() <= 50
-        && data.password is string && data.password.size() >= 6
-        && data.role in ['chef', 'kid']
-        && data.name is string && data.name.size() > 0 && data.name.size() <= 200
-        && data.createdAt is timestamp
+      return data.get('username', '') is string && data.get('username', '').size() <= 50
+        && data.get('role', 'kid') in ['chef', 'kid']
+        && data.get('name', '') is string && data.get('name', '').size() <= 200
+        && (!data.keys().hasAny(['password']) || (data.password is string && data.password.size() >= 6))
         && (!data.keys().hasAny(['avatar']) || (data.avatar is string && data.avatar.size() < 2000))
-        && (!data.keys().hasAny(['favorites']) || (data.favorites is list && data.favorites.size() <= 200));
+        && (!data.keys().hasAny(['favorites']) || (data.favorites is list && data.favorites.size() <= 200))
+        && (!data.keys().hasAny(['oneSignalIds']) || (data.oneSignalIds is list && data.oneSignalIds.size() <= 10))
+        && (!data.keys().hasAny(['readNews']) || (data.readNews is list && data.readNews.size() <= 500));
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isChef() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'chef';
     }
 
     match /users/{userId} {
       allow read: if true; 
-      allow create: if isValidUser(incoming()) && isValidId(userId);
-      allow update: if isValidUser(incoming()) && isValidId(userId) && (
-        incoming().username == existing().username &&
-        incoming().role == existing().role &&
-        incoming().createdAt == existing().createdAt
-      );
+      allow create: if isValidUser(incoming()) && isValidId(userId) && incoming().keys().hasAll(['username', 'role', 'name', 'createdAt']);
+      allow update: if isOwner(userId) && isValidUser(incoming()) && 
+        incoming().get('username', '') == existing().get('username', '') &&
+        incoming().get('role', 'kid') == existing().get('role', 'kid') &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'avatar', 'favorites', 'oneSignalIds', 'readNews', 'password']);
     }
 
     // --- Recipe Validation ---
     function isValidRecipe(data) {
-      return data.keys().hasAll(['title', 'description', 'ingredients', 'steps', 'createdBy', 'createdAt', 'isPublished'])
-        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
-        && data.description is string && data.description.size() <= 2000
-        && data.ingredients is list && data.ingredients.size() <= 50
-        && data.steps is list && data.steps.size() <= 50
-        && data.createdBy is string && isValidId(data.createdBy)
-        && data.isPublished is bool
+      return data.get('title', '') is string && data.get('title', '').size() <= 200
+        && data.get('description', '') is string && data.get('description', '').size() <= 2000
+        && data.get('createdBy', '') is string
+        && data.get('isPublished', true) is bool
         && (data.get('avgRating', 0) is number)
         && (data.get('totalRatings', 0) is number)
         && (data.get('favoriteCount', 0) is number);
@@ -56,8 +64,14 @@ service cloud.firestore {
 
     match /recipes/{recipeId} {
       allow read: if true;
-      allow create, update: if isValidRecipe(incoming()) && isValidId(recipeId);
-      allow delete: if true;
+      allow create: if isChef() && isValidRecipe(incoming()) && isValidId(recipeId) && incoming().keys().hasAll(['title', 'description', 'createdBy', 'createdAt', 'isPublished']);
+      allow update: if isSignedIn() && (
+        // Chef can update everything
+        (isChef() && isValidRecipe(incoming())) ||
+        // Anyone signed in can increment/decrement favoriteCount
+        (incoming().diff(existing()).affectedKeys().hasOnly(['favoriteCount']) && isValidRecipe(incoming()))
+      );
+      allow delete: if isChef();
     }
 
     // --- WeeklyMenu Validation ---
@@ -69,8 +83,7 @@ service cloud.firestore {
 
     match /weeklyMenu/{menuId} {
       allow read: if true;
-      allow create, update: if isValidMenu(incoming()) && isValidId(menuId);
-      allow delete: if true;
+      allow create, update, delete: if isChef() && isValidMenu(incoming()) && isValidId(menuId);
     }
 
     // --- Order Validation ---
@@ -82,8 +95,10 @@ service cloud.firestore {
         && data.recipeId is string && isValidId(data.recipeId)
         && data.recipeIds is list && data.recipeIds.size() > 0 && data.recipeIds.size() <= 10
         && data.status in ['pending', 'preparing', 'ready', 'on_the_way', 'arrived', 'done', 'cancelled']
+        && (!data.keys().hasAny(['cancelReason']) || (data.cancelReason is string && data.cancelReason.size() <= 1000))
         && data.createdAt is timestamp
-        && data.updatedAt is timestamp;
+        && data.updatedAt is timestamp
+        && (!data.keys().hasAny(['itemAddedAt']) || data.itemAddedAt is map);
     }
 
     match /orders/{orderId} {
@@ -91,9 +106,9 @@ service cloud.firestore {
       allow create: if isValidOrder(incoming());
       allow update: if isValidOrder(incoming()) && (
         // Only allow status updates or recipe updates if pending or cancelled
-        (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'cancelReason']) ||
         ((existing().status == 'pending' || existing().status == 'cancelled') && 
-         incoming().diff(existing()).affectedKeys().hasOnly(['recipeId', 'recipeIds', 'status', 'updatedAt'])))
+         incoming().diff(existing()).affectedKeys().hasOnly(['recipeId', 'recipeIds', 'status', 'updatedAt', 'itemAddedAt', 'cancelReason'])))
       );
       allow delete: if existing().status == 'pending';
     }
@@ -110,20 +125,19 @@ service cloud.firestore {
     }
 
     match /news/{newsId} {
-      allow read: if resource.data.isPublished == true || (request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'chef');
-      allow create, update: if isValidNews(incoming());
-      allow delete: if true;
+      allow read: if resource.data.isPublished == true || isChef();
+      allow create, update, delete: if isChef() && isValidNews(incoming());
     }
 
     // --- Review Validation ---
     function isValidReview(data) {
-      return data.keys().hasAll(['recipeId', 'authorId', 'authorName', 'authorRole', 'comment', 'createdAt'])
-        && data.recipeId is string && isValidId(data.recipeId)
+      return data.keys().hasAll(['authorId', 'authorName', 'authorRole', 'comment', 'createdAt'])
         && data.authorId is string && isValidId(data.authorId)
         && data.authorName is string && data.authorName.size() <= 100
         && data.authorRole in ['chef', 'kid']
         && data.comment is string && data.comment.size() <= 2000
         && data.createdAt is timestamp
+        && (!data.keys().hasAny(['recipeId']) || (data.recipeId is string && isValidId(data.recipeId)))
         && (data.get('rating', 0) is number)
         && (data.get('parentId', '') is string)
         && (data.get('orderId', '') is string)
@@ -153,8 +167,7 @@ service cloud.firestore {
 
     match /config/main {
       allow read: if true;
-      allow create, update: if isValidKitchenConfig(incoming());
-      allow delete: if true;
+      allow create, update, delete: if isChef() && isValidKitchenConfig(incoming());
     }
 
     // --- Achievement Validation ---

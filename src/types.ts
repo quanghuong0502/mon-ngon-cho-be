@@ -71,14 +71,16 @@ export interface Order {
   recipeId?: string; // Keep for backward compatibility during migration
   recipeIds: string[];
   status: OrderStatus;
+  cancelReason?: string;
   createdAt: any;
   updatedAt: any;
+  itemAddedAt?: Record<string, any>;
 }
 
 export interface Review {
   id?: string;
   orderId?: string; // Optional because replies might not be directly linked to an order
-  recipeId: string;
+  recipeId?: string;
   authorId: string;
   authorName: string;
   authorAvatar?: string;

@@ -66,7 +66,7 @@ import { sendPushToUser, getChefOneSignalIds } from '../../lib/oneSignal';
 import BottomSheet from '../../components/BottomSheet';
 
 interface ReviewModalProps {
-  recipe: Recipe;
+  recipes: Recipe[];
   orderId: string;
   orderDate: Date;
   orderDay: string;
@@ -76,7 +76,7 @@ interface ReviewModalProps {
   onSuccess: () => void;
 }
 
-function ReviewModal({ recipe, orderId, orderDate, orderDay, user, existingReview, onClose, onSuccess }: ReviewModalProps) {
+function ReviewModal({ recipes, orderId, orderDate, orderDay, user, existingReview, onClose, onSuccess }: ReviewModalProps) {
   const [rating, setRating] = useState(existingReview?.rating || 0);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState(existingReview?.comment || '');
@@ -100,13 +100,21 @@ function ReviewModal({ recipe, orderId, orderDate, orderDay, user, existingRevie
   };
 
   const getTagsByRating = (r: number) => {
-    const custom = recipe.reviewTags;
-    
-    // Find a matching rule based on exact star rating
-    if (custom && Array.isArray(custom)) {
-      const match = custom.find(rule => r === rule.star);
-      if (match && match.tags.length > 0) return match.tags;
-    }
+    // Collect all unique tags from all recipes in this order
+    const allCustomTags: string[] = [];
+    recipes.forEach(recipe => {
+      const custom = recipe.reviewTags;
+      if (custom && Array.isArray(custom)) {
+        const match = custom.find(rule => r === rule.star);
+        if (match && match.tags.length > 0) {
+          match.tags.forEach(t => {
+            if (!allCustomTags.includes(t)) allCustomTags.push(t);
+          });
+        }
+      }
+    });
+
+    if (allCustomTags.length > 0) return allCustomTags;
 
     // Default fallbacks if no custom rule matches
     if (r === 5) return ['Ngon tuyệt! 😋', 'Rất thích! ❤️', 'Trang trí đẹp', 'Nhiều đồ ăn'];
@@ -206,7 +214,6 @@ function ReviewModal({ recipe, orderId, orderDate, orderDay, user, existingRevie
       }
 
       await addDoc(collection(db, 'reviews'), {
-        recipeId: recipe.id,
         orderId,
         authorId: user.userId,
         authorName: user.name,
@@ -218,20 +225,23 @@ function ReviewModal({ recipe, orderId, orderDate, orderDay, user, existingRevie
         createdAt: Timestamp.now()
       });
 
-      const recipeRef = doc(db, 'recipes', recipe.id!);
-      const recipeDoc = await getDoc(recipeRef);
-      if (recipeDoc.exists()) {
-        const data = recipeDoc.data();
-        const currentTotal = data.totalRatings || 0;
-        const currentAvg = data.avgRating || 0;
-        const newTotal = currentTotal + 1;
-        const newAvg = (currentAvg * currentTotal + rating) / newTotal;
+      // Update ratings for all recipes in the order
+      await Promise.all(recipes.map(async (recipe) => {
+        const recipeRef = doc(db, 'recipes', recipe.id!);
+        const recipeDoc = await getDoc(recipeRef);
+        if (recipeDoc.exists()) {
+          const data = recipeDoc.data();
+          const currentTotal = data.totalRatings || 0;
+          const currentAvg = data.avgRating || 0;
+          const newTotal = currentTotal + 1;
+          const newAvg = (currentAvg * currentTotal + rating) / newTotal;
 
-        await updateDoc(recipeRef, {
-          totalRatings: newTotal,
-          avgRating: newAvg
-        });
-      }
+          await updateDoc(recipeRef, {
+            totalRatings: newTotal,
+            avgRating: newAvg
+          });
+        }
+      }));
 
       toast.success('Cảm ơn bé đã đánh giá nhé!', { id: toastId });
       setIsSuccess(true);
@@ -244,10 +254,13 @@ function ReviewModal({ recipe, orderId, orderDate, orderDay, user, existingRevie
             ? (comment.length > 80 ? comment.substring(0, 77) + '...' : comment)
             : 'Không có bình luận';
 
+          const recipeTitles = recipes.map(r => r.title).join(', ');
+          const displayTitles = recipeTitles.length > 50 ? recipeTitles.substring(0, 47) + '...' : recipeTitles;
+
           await sendPushToUser(
             chefIds,
-            `Bé ${user.name || ''} đã đánh giá món ăn! ${starsLabel}`,
-            `"${shortComment}" — món ${recipe.title}`,
+            `Bé ${user.name || ''} đã đánh giá đơn hàng! ${starsLabel}`,
+            `"${shortComment}" — các món: ${displayTitles}`,
             '/chef/reviews'
           );
         }
@@ -291,14 +304,14 @@ function ReviewModal({ recipe, orderId, orderDate, orderDay, user, existingRevie
       </div>
       <div>
         <h2 className="text-[17px] font-black text-foreground leading-tight">
-          {isReadOnly ? 'Đánh giá món' : 'Bé thấy món thế nào?'}
+          {isReadOnly ? 'Đánh giá đơn hàng' : 'Bé thấy bữa ăn thế nào?'}
         </h2>
         <div className="flex flex-col mt-0.5">
           <p className="text-[14px] font-black text-primary leading-tight">
-            {recipe.title}
+            Đơn hàng ngày {format(orderDate, 'dd/MM')}
           </p>
           <p className="text-[12px] font-medium text-muted-foreground mt-0.5">
-            {orderDay}, {format(orderDate, 'dd/MM')}
+            {orderDay}, {recipes.length} món
           </p>
         </div>
       </div>
@@ -510,7 +523,7 @@ export default function MyOrders() {
   const [loading, setLoading] = useState(true);
   const [kitchenConfig, setKitchenConfig] = useState<any>(null);
   const [isKitchenOpen, setIsKitchenOpen] = useState(false);
-  const [reviewingMeal, setReviewingMeal] = useState<{ recipe: Recipe, orderId: string, orderDate: Date, orderDay: string } | null>(null);
+  const [reviewingMeal, setReviewingMeal] = useState<{ recipes: Recipe[], orderId: string, orderDate: Date, orderDay: string } | null>(null);
   const [selectedImages, setSelectedImages] = useState<string[] | null>(null);
   const [weekIdx, setWeekIdx] = useState(0);
   const [reviewFilter, setReviewFilter] = useState<'all' | 'unreviewed' | 'reviewed'>('all');
@@ -661,9 +674,7 @@ export default function MyOrders() {
       const reviewMap: Record<string, Review> = {};
       snap.docs.forEach(doc => {
         const data = doc.data() as Review;
-        if (data.orderId && data.recipeId) {
-          reviewMap[`${data.orderId}_${data.recipeId}`] = { id: doc.id, ...data };
-        } else if (data.orderId) {
+        if (data.orderId) {
           reviewMap[data.orderId] = { id: doc.id, ...data };
         }
       });
@@ -816,7 +827,8 @@ export default function MyOrders() {
           )}
 
           {weekOrders.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-24 text-center bg-card rounded-[32px] border border-border shadow-sm px-6">
+              <div className={`flex flex-col items-center justify-center py-24 text-center bg-card rounded-[32px] border border-border shadow-sm px-6 ${isReviewsPage && weeks.length > 0 ? 'mt-4': ''} ${!isReviewsPage ? 'mt-8' : ''}`}
+              >
                 <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center mb-6 text-muted-foreground/30">
                   {isReviewsPage ? <Star size={40} /> : <Utensils size={40} />}
                 </div>
@@ -849,6 +861,8 @@ export default function MyOrders() {
                   const statusInfo = getStatusDisplay(order.status);
                   const dayLabel = { mon: 'Thứ Hai', tue: 'Thứ Ba', wed: 'Thứ Tư', thu: 'Thứ Năm', fri: 'Thứ Sáu' }[order.day];
                   const isActive = ['ready', 'on_the_way', 'arrived'].includes(order.status);
+                  const review = reviews[order.id!];
+                  const hasReview = !!review;
 
                   return (
                     <motion.div 
@@ -859,7 +873,24 @@ export default function MyOrders() {
                       }`}
                     >
                       <div className="flex items-center justify-between mb-4">
-                        <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">{dayLabel}</span>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">{dayLabel}</span>
+                          {isReviewsPage && (
+                            <div className="mt-1">
+                              {hasReview ? (
+                                <div className="flex items-center gap-1 bg-secondary px-3 py-1.5 rounded-xl text-primary font-black text-[10px] uppercase tracking-wider w-fit">
+                                  <Star size={12} className="fill-current" />
+                                  Đã đánh giá
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 bg-secondary px-3 py-1.5 rounded-xl text-muted-foreground font-black text-[10px] uppercase tracking-wider w-fit">
+                                  <Star size={12} className="fill-current" />
+                                  Chưa đánh giá
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                         {!isReviewsPage && (
                           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${statusInfo.color}`}>
                             {statusInfo.icon}
@@ -870,30 +901,9 @@ export default function MyOrders() {
 
                       {orderRecipeIds.map((rid, idx) => {
                         const recipe = recipes[rid];
-                        const reviewKey = `${order.id}_${rid}`;
-                        const review = reviews[reviewKey] || reviews[order.id!];
-                        const hasReview = !!review && (review.recipeId === rid || !review.recipeId);
-
                         return (
                           <div key={rid + idx} className="mb-6 last:mb-0">
-                            {/* Header for individual recipe if reviews page */}
-                            {isReviewsPage && (
-                              <div className="flex items-center justify-between mb-3 px-1">
-                                {hasReview ? (
-                                  <div className="flex items-center gap-1 bg-secondary px-3 py-1.5 rounded-xl text-primary font-black text-[10px] uppercase tracking-wider">
-                                    <Star size={12} className="fill-current" />
-                                    Đã đánh giá
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1 bg-secondary px-3 py-1.5 rounded-xl text-muted-foreground font-black text-[10px] uppercase tracking-wider">
-                                    <Star size={12} className="fill-current" />
-                                    Chưa đánh giá
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            <div className="flex gap-5 mb-4">
+                            <div className="flex gap-5">
                               <div className={`w-20 h-20 rounded-2xl overflow-hidden bg-secondary flex-shrink-0 border border-border ${order.status === 'cancelled' ? 'grayscale opacity-50' : ''}`}>
                                 {recipe?.imageUrl ? (
                                   <img src={getOptimizedUrl(recipe.imageUrl, 200)} className="w-full h-full object-cover" />
@@ -903,56 +913,63 @@ export default function MyOrders() {
                               </div>
                               <div className="flex flex-col justify-center min-w-0 flex-1">
                                 <h4 className={`font-medium text-foreground text-base mb-1 truncate leading-tight ${order.status === 'cancelled' ? 'line-through text-muted-foreground' : ''}`}>{recipe?.title || 'Đang tải...'}</h4>
-                                <p className="text-[12px] text-muted-foreground mb-2">{format(order.createdAt.toDate(), 'HH:mm - dd/MM', { locale: vi })}</p>
-                                
-                                {isReviewsPage && (
-                                  <div className="flex items-center gap-1">
-                                    {[1, 2, 3, 4, 5].map(star => (
-                                      <Star 
-                                        key={star} 
-                                        size={16} 
-                                        className={star <= (review?.rating || 0) ? 'text-primary fill-primary' : 'text-muted/20 fill-muted/5'} 
-                                      />
-                                    ))}
-                                    {hasReview && (
-                                      <span className="ml-2 text-sm font-bold text-primary">{review.rating}</span>
-                                    )}
-                                  </div>
-                                )}
+                                <p className="text-[12px] text-muted-foreground">
+                                  {(() => {
+                                    const itemTime = order.itemAddedAt?.[rid] || order.createdAt;
+                                    const date = itemTime?.toDate ? itemTime.toDate() : new Date();
+                                    return format(date, 'HH:mm - dd/MM', { locale: vi });
+                                  })()}
+                                </p>
                               </div>
                             </div>
-
-                            {isReviewsPage && hasReview && review.comment && (
-                              <div className="mb-4 p-4 bg-primary/5 rounded-2xl text-[13px] text-foreground/80 font-medium italic border border-primary/10">
-                                "{review.comment}"
-                              </div>
-                            )}
-
-                            {(order.status === 'done' || isReviewsPage) && recipe && (
-                              <button 
-                                onClick={() => setReviewingMeal({ 
-                                  recipe, 
-                                  orderId: order.id!, 
-                                  orderDate: order.createdAt.toDate(),
-                                  orderDay: dayLabel
-                                })}
-                                className={`w-full h-12 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all border-2 flex items-center justify-center gap-2 ${
-                                  hasReview 
-                                  ? 'border-border text-muted-foreground hover:bg-secondary' 
-                                  : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground shadow-lg shadow-primary-shadow/30'
-                                }`}
-                              >
-                                {hasReview ? 'Xem lại đánh giá' : (
-                                  <>
-                                    <Star size={14} className="fill-current" />
-                                    Đánh giá ngay
-                                  </>
-                                )}
-                              </button>
-                            )}
                           </div>
                         );
                       })}
+
+                      {isReviewsPage && hasReview && (
+                        <div className="mt-4 pt-4 border-t border-border">
+                          <div className="flex items-center gap-1 mb-3">
+                            {[1, 2, 3, 4, 5].map(star => (
+                              <Star 
+                                key={star} 
+                                size={20} 
+                                className={star <= (review?.rating || 0) ? 'text-primary fill-primary' : 'text-muted/20 fill-muted/5'} 
+                              />
+                            ))}
+                            <span className="ml-2 text-base font-bold text-primary">{review.rating}</span>
+                          </div>
+                          {review.comment && (
+                            <div className="p-4 bg-primary/5 rounded-2xl text-[13px] text-foreground/80 font-medium italic border border-primary/10">
+                              "{review.comment}"
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {(order.status === 'done' || isReviewsPage) && (
+                        <div className="mt-6">
+                           <button 
+                            onClick={() => setReviewingMeal({ 
+                              recipes: orderRecipeIds.map(id => recipes[id]).filter(Boolean), 
+                              orderId: order.id!, 
+                              orderDate: order.createdAt.toDate(),
+                              orderDay: dayLabel
+                            })}
+                            className={`w-full h-12 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all border-2 flex items-center justify-center gap-2 ${
+                              hasReview 
+                              ? 'border-border text-muted-foreground hover:bg-secondary' 
+                              : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground shadow-lg shadow-primary-shadow/30'
+                            }`}
+                          >
+                            {hasReview ? 'Xem lại đánh giá' : (
+                              <>
+                                <Star size={14} className="fill-current" />
+                                Đánh giá ngay
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
 
                       {isActive && (
                         <div className="mt-4 pt-4 border-t border-border space-y-4">
@@ -1060,12 +1077,12 @@ export default function MyOrders() {
       <AnimatePresence>
         {reviewingMeal && (
           <ReviewModal 
-            recipe={reviewingMeal.recipe}
+            recipes={reviewingMeal.recipes}
             orderId={reviewingMeal.orderId}
             orderDate={reviewingMeal.orderDate}
             orderDay={reviewingMeal.orderDay}
             user={user!}
-            existingReview={reviews[`${reviewingMeal.orderId}_${reviewingMeal.recipe.id}`] || reviews[reviewingMeal.orderId]}
+            existingReview={reviews[reviewingMeal.orderId]}
             onClose={() => setReviewingMeal(null)}
             onSuccess={() => setReviewingMeal(null)}
           />

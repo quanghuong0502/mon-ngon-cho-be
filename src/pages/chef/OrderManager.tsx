@@ -370,6 +370,20 @@ function OrderCard({ order, recipes, review, kid, onUpdate }: OrderCardProps) {
           Cập nhật: {order.updatedAt ? format(order.updatedAt.toDate(), 'HH:mm', { locale: vi }) : '---'}
         </p>
 
+        {order.status === 'cancelled' && order.cancelReason && (
+          <div className="mt-2 p-4 bg-destructive/5 rounded-2xl border border-destructive/10 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5 text-destructive">
+                <Trash2 size={12} strokeWidth={3} />
+                <span className="text-[10px] font-black uppercase tracking-widest text-destructive">Lý do huỷ món</span>
+              </div>
+            </div>
+            <p className="text-[13px] text-destructive/80 font-medium italic leading-relaxed">
+              "{order.cancelReason}"
+            </p>
+          </div>
+        )}
+
         {review && (
           <div className="mt-2 p-4 bg-card rounded-2xl border border-border shadow-sm">
             <div className={`flex items-center justify-between ${review.comment ? 'mb-2' : ''}`}>

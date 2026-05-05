@@ -13,6 +13,8 @@ interface ConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   confirmStyle?: 'danger' | 'warning' | 'primary';
+  confirmDisabled?: boolean;
+  children?: React.ReactNode;
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -24,19 +26,27 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   message,
   confirmText = 'Xác nhận',
   cancelText = 'Hủy bỏ',
-  confirmStyle = 'danger'
+  confirmStyle = 'danger',
+  confirmDisabled = false,
+  children
 }) => {
   const getConfirmButtonStyle = () => {
+    const disabledClasses = confirmDisabled ? 'opacity-50 cursor-not-allowed shadow-none' : 'shadow-lg hover:opacity-90';
+    
     switch (confirmStyle) {
       case 'danger':
-        return 'bg-destructive/10 text-destructive hover:bg-destructive/20';
+        return `bg-primary text-primary-foreground ${disabledClasses}`;
       case 'warning':
-        return 'bg-amber-100 text-amber-600 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400';
+        return `bg-amber-500 text-white ${disabledClasses}`;
       case 'primary':
-        return 'bg-primary/10 text-primary hover:bg-primary/20';
+        return `bg-primary text-primary-foreground ${disabledClasses}`;
       default:
-        return 'bg-destructive/10 text-destructive hover:bg-destructive/20';
+        return `bg-primary text-primary-foreground ${disabledClasses}`;
     }
+  };
+
+  const getCancelButtonStyle = () => {
+    return 'bg-card text-destructive border-destructive/20 shadow-md hover:bg-destructive/5';
   };
 
   return (
@@ -66,29 +76,40 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
               </div>
 
               {/* Title */}
-              <h3 className="text-[17px] font-semibold text-foreground mb-2">{title}</h3>
+              <h3 className={`text-[18px] font-semibold text-foreground ${message ? "mb-2" : "mb-4"}`}>{title}</h3>
 
               {/* Message */}
-              <p className="text-[13px] text-muted-foreground text-center leading-[1.6] mb-8">
+              {message && (
+                <p className="text-[14px] text-muted-foreground text-center leading-[1.6] mb-4">
                 {message}
               </p>
+              )}
+
+              {children && (
+                <div className="w-full mb-6">
+                  {children}
+                </div>
+              )}
 
               {/* Buttons */}
               <div className="w-full flex flex-col gap-3">
                 <button
+                  disabled={confirmDisabled}
                   onClick={() => {
-                    onConfirm();
-                    onClose();
+                    if (!confirmDisabled) {
+                      onConfirm();
+                      onClose();
+                    }
                   }}
-                  className={`w-full h-[44px] rounded-[12px] font-medium transition-colors ${getConfirmButtonStyle()}`}
+                  className={`w-full py-3.5 rounded-xl font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 ${getConfirmButtonStyle()}`}
                 >
-                  {confirmText}
+                  <span className="text-[10px] uppercase tracking-wider">{confirmText}</span>
                 </button>
                 <button
                   onClick={onClose}
-                  className="w-full h-[44px] rounded-[12px] bg-secondary text-muted-foreground font-medium hover:text-foreground transition-colors"
+                  className={`w-full py-3.5 rounded-xl font-bold transition-all active:scale-95 border flex items-center justify-center ${getCancelButtonStyle()}`}
                 >
-                  {cancelText}
+                  <span className="text-[10px] uppercase tracking-wider">{cancelText}</span>
                 </button>
               </div>
             </motion.div>
