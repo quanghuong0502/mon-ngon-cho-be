@@ -42,6 +42,8 @@ export interface Recipe {
   isPublished: boolean;
   avgRating: number;
   totalRatings: number;
+  categoryId?: string;
+  shortDescription?: string;
   favoriteCount?: number;
   reviewTags?: {
     star: number;
@@ -71,7 +73,9 @@ export interface Order {
   recipeId?: string; // Keep for backward compatibility during migration
   recipeIds: string[];
   status: OrderStatus;
+  cancelledBy?: 'chef' | 'kid';
   cancelReason?: string;
+  cancelledAt?: any;
   createdAt: any;
   updatedAt: any;
   itemAddedAt?: Record<string, any>;
@@ -100,4 +104,22 @@ export interface News {
   createdBy: string;
   createdAt: any;
   isPinned: boolean;
+}
+
+export interface CancelReason {
+  id?: string;
+  label: string;
+  order: number;
+  isActive: boolean;
+  createdAt: any;
+}
+
+export interface Category {
+  id?: string;
+  name: string;
+  emoji: string;
+  color: string;
+  order: number;
+  isActive: boolean;
+  createdAt: any;
 }

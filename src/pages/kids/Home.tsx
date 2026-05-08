@@ -18,10 +18,11 @@ import {
   documentId
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { News, Recipe, WeeklyMenu, User } from '../../types';
+import { News, Recipe, WeeklyMenu, User, Category } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import Avatar from '../../components/Avatar';
 import { motion, AnimatePresence } from 'motion/react';
+import { useCategory } from '../../context/CategoryContext';
 import { 
   ChevronRight, 
   Star, 
@@ -43,7 +44,8 @@ import {
   History,
   Info,
   Sparkles,
-  Inbox
+  Inbox,
+  CircleCheckBig
 } from 'lucide-react';
 import { format, startOfWeek } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -85,11 +87,15 @@ export default function KidsHome() {
   const [isKitchenOpen, setIsKitchenOpen] = useState(false);
   const [readNewsIds, setReadNewsIds] = useState<string[]>([]);
   const [isMounted, setIsMounted] = useState(false);
+  const greetingName = user?.username || user?.displayName || 'em';
+  const todayFormatted = format(new Date(), 'eeee, dd/MM', { locale: vi });
 
   // Modals
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [selectedNews, setSelectedNews] = useState<News | null>(null);
   const [selectedDayMenu, setSelectedDayMenu] = useState<DayMenu | null>(null);
+  const { categories, getCategoryById } = useCategory();
+  const [selectedCategoryId, setSelectedCategoryId] = useState<'All' | string>('All');
 
   useLockBodyScroll(!!selectedRecipe || !!selectedNews || !!selectedDayMenu);
 
@@ -496,10 +502,22 @@ export default function KidsHome() {
     return tmp.textContent || tmp.innerText || '';
   };
 
-  if (loading) return <div className="p-20 text-center"><ChefHat className="animate-bounce mx-auto text-primary" size={48} /></div>;
+  const filteredDaysMenu = daysMenu.map(day => {
+    const filteredMeals = selectedCategoryId === 'All' 
+      ? day.meals 
+      : day.meals.filter(m => m.categoryId === selectedCategoryId);
+    
+    return {
+      ...day,
+      meals: filteredMeals,
+      mealCount: filteredMeals.length
+    };
+  }).filter(day => day.meals.length > 0);
 
-  const greetingName = user?.name || 'Bé';
-  const todayFormatted = format(new Date(), 'EEEE, dd/MM', { locale: vi });
+  // Get active categories that have meals this week
+  const activeCategoriesInMenu = categories.filter(cat => 
+    daysMenu.some(day => day.meals.some(m => m.categoryId === cat.id))
+  );
 
   return (
     <div className="h-full overflow-y-auto scrollbar-hide kid-page-content">
@@ -640,126 +658,134 @@ export default function KidsHome() {
               {/* Decorative stuff */}
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16 blur-3xl opacity-50" />
               
-              <div className="relative z-10 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
-                      <UtensilsCrossed size={28} />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-black tracking-tight leading-1.5">
-                        {todayOrder.status === 'ready' && 'Bữa ăn đã sẵn sàng!'}
-                        {todayOrder.status === 'on_the_way' && 'Bữa ăn đang tới!'}
-                        {todayOrder.status === 'arrived' && 'Đã tới nơi rồi!'}
-                      </h3>
-                      <p className="text-primary-foreground/90 text-sm font-medium leading-1.5">Bé mau qua bếp nhận món nhé</p>
-                    </div>
+              <div className="relative z-10 flex flex-col gap-[12px]">
+                {/* 1. Header row */}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+                    <UtensilsCrossed size={22} />
+                  </div>
+                  <div className="flex flex-col">
+                    <h3 className="text-[17px] font-bold leading-tight">
+                      {todayOrder.status === 'ready' && 'Bữa ăn đã sẵn sàng!'}
+                      {todayOrder.status === 'on_the_way' && 'Bữa ăn đang tới!'}
+                      {todayOrder.status === 'arrived' && 'Đã tới nơi rồi!'}
+                    </h3>
+                    <p className="text-[13px] opacity-85 mt-0.5 font-medium leading-tight">Bé mau qua bếp nhận món nhé</p>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-1.5 p-1">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${isKitchenOpen ? 'bg-green-400 animate-pulse' : 'bg-slate-300'}`} />
-                      <span className="text-[11px] font-black uppercase tracking-widest text-primary-foreground/80">
-                        {isKitchenOpen ? 'Bếp đang mở' : 'Bếp đã đóng'}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-0.5 text-primary-foreground/90 leading-1.5">
-                      <div className="flex items-center gap-2 text-xs font-bold">
-                        <Clock size={12} />
-                        <span>{kitchenConfig?.openTime} – {kitchenConfig?.closeTime}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs font-bold opacity-80 pl-5">
-                        <span>{
-                          Array.isArray(kitchenConfig?.servingDays) 
-                          ? kitchenConfig.servingDays
-                              .map((d: string) => {
-                                const day = [
-                                  { key: 'mon', label: 'Thứ 2' },
-                                  { key: 'tue', label: 'Thứ 3' },
-                                  { key: 'wed', label: 'Thứ 4' },
-                                  { key: 'thu', label: 'Thứ 5' },
-                                  { key: 'fri', label: 'Thứ 6' },
-                                  { key: 'sat', label: 'Thứ 7' },
-                                  { key: 'sun', label: 'Chủ Nhật' }
-                                ].find(item => item.key === d);
-                                return day?.label;
-                              })
-                              .filter(Boolean)
-                              .join(', ')
-                          : kitchenConfig?.servingDays
-                        }</span>
-                      </div>
-                    </div>
+                {/* 2. Kitchen status */}
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isKitchenOpen ? 'bg-green-400 animate-pulse' : 'bg-slate-300'}`} />
+                  <span className="text-[11px] font-black uppercase tracking-widest text-primary-foreground/80">
+                    {isKitchenOpen ? 'Bếp đang mở' : 'Bếp đã đóng'}
+                  </span>
+                </div>
+
+                {/* 3. Service Hours and Days */}
+                <div className="flex flex-col gap-1 text-primary-foreground/90 leading-tight">
+                  <div className="flex items-center gap-2 text-xs font-bold">
+                    <Clock size={12} />
+                    <span>{kitchenConfig?.openTime} – {kitchenConfig?.closeTime}</span>
                   </div>
+                  <div className="text-xs font-bold opacity-80 pl-5">
+                    <span>{
+                      Array.isArray(kitchenConfig?.servingDays) 
+                      ? kitchenConfig.servingDays
+                          .map((d: string) => {
+                            const day = [
+                              { key: 'mon', label: 'T2' },
+                              { key: 'tue', label: 'T3' },
+                              { key: 'wed', label: 'T4' },
+                              { key: 'thu', label: 'T5' },
+                              { key: 'fri', label: 'T6' },
+                              { key: 'sat', label: 'T7' },
+                              { key: 'sun', label: 'CN' }
+                            ].find(item => item.key === d);
+                            return day?.label;
+                          })
+                          .filter(Boolean)
+                          .join(', ')
+                      : kitchenConfig?.servingDays
+                    }</span>
+                  </div>
+                </div>
 
-                     <div className="flex items-center gap-2">
-                        <button
-                          disabled={!isKitchenOpen}
-                          onClick={() => updateOrderStatus('on_the_way')}
-                          className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
-                            isKitchenOpen 
-                              ? 'bg-card text-primary hover:scale-[1.02] active:scale-95' 
-                              : 'bg-primary-foreground/20 text-primary-foreground/50 cursor-not-allowed border border-white/10'
-                          }`}
-                        >
-                          <Navigation size={18} className="rotate-45" />
-                          Lấy món
-                        </button>
-                        {kitchenConfig?.mapsShareLink && (
-                          <button
-                            onClick={() => window.open(kitchenConfig.mapsShareLink, '_blank')}
-                            className="w-14 h-14 border-[1.5px] border-primary-foreground/40 bg-white/10 text-primary-foreground rounded-2xl font-bold flex items-center justify-center shrink-0 active:scale-95 transition-all hover:bg-white/20"
-                          >
-                            <MapPin size={24} />
-                          </button>
-                        )}
-                      </div>
-
-                  {todayOrder.status === 'on_the_way' && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        disabled={!isKitchenOpen}
-                        onClick={() => updateOrderStatus('arrived')}
-                        className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
-                          isKitchenOpen 
-                            ? 'bg-card text-primary hover:scale-[1.02] active:scale-95' 
-                            : 'bg-primary-foreground/20 text-primary-foreground/50 cursor-not-allowed border border-white/10'
-                        }`}
-                      >
-                        <MapPin size={18} />
-                        Đã tới bếp!
-                      </button>
-                    </div>
+                {/* 4. Button row */}
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={!isKitchenOpen || todayOrder.status !== 'ready'}
+                    onClick={() => updateOrderStatus('on_the_way')}
+                    className={`flex-1 h-[44px] rounded-[12px] font-black uppercase tracking-widest text-xs shadow-lg transition-all flex items-center justify-center gap-2 ${
+                      isKitchenOpen && todayOrder.status === 'ready'
+                        ? 'bg-card text-primary hover:scale-[1.02] active:scale-95' 
+                        : 'bg-primary-foreground/20 text-primary-foreground/50 cursor-not-allowed border border-white/10'
+                    }`}
+                  >
+                    <Navigation size={16} className="rotate-45" />
+                    {todayOrder.status === 'ready' ? 'Lấy món' : (todayOrder.status === 'on_the_way' ? 'Bé đang đến...' : 'Bé đã tới bếp!')}
+                  </button>
+                  {kitchenConfig?.mapsShareLink && (
+                    <button
+                      disabled={!isKitchenOpen || todayOrder.status === 'arrived'}
+                      onClick={() => todayOrder.status !== 'arrived' && window.open(kitchenConfig.mapsShareLink, '_blank')}
+                      className={`w-[44px] h-[44px] rounded-[12px] shadow-lg flex items-center justify-center shrink-0 active:scale-95 transition-all ${
+                        isKitchenOpen && todayOrder.status !== 'arrived'
+                          ? 'bg-card text-primary hover:scale-[1.02]' 
+                          : 'bg-primary-foreground/20 text-primary-foreground/50 cursor-not-allowed border border-white/10'
+                      }`}
+                    >
+                      <MapPin size={20} />
+                    </button>
                   )}
                 </div>
 
-                {kitchenConfig?.mapsShareLink && (
+                {todayOrder.status === 'on_the_way' && (
                   <button
-                    onClick={() => window.open(kitchenConfig.mapsShareLink, '_blank')}
-                    className="w-full h-10 border-[1.5px] border-primary-foreground/40 bg-white/10 text-primary-foreground rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-white/20"
+                    disabled={!isKitchenOpen}
+                    onClick={() => updateOrderStatus('arrived')}
+                    className={`w-full h-[44px] rounded-[12px] font-black uppercase tracking-widest text-xs shadow-lg transition-all flex items-center justify-center gap-2 ${
+                      isKitchenOpen 
+                        ? 'bg-card text-primary hover:scale-[1.02] active:scale-95' 
+                        : 'bg-primary-foreground/20 text-primary-foreground/50 cursor-not-allowed border border-white/10'
+                    }`}
                   >
                     <MapPin size={16} />
-                    Xem đường đến bếp
+                    Đã tới bếp!
                   </button>
                 )}
 
-                <div className="flex flex-col gap-3">
-                  {kitchenConfig?.directions && (
-                    <div className="flex items-start gap-3 bg-white/10 p-5 rounded-[24px] border border-white/10 backdrop-blur-sm">
-                      <Navigation size={20} className="shrink-0 mt-1" />
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground/80 mb-1">Cách đi tới bếp</p>
-                        <p className="text-sm font-medium leading-relaxed italic">
-                          {kitchenConfig?.directions}
-                        </p>
-                      </div>
+                {/* Directions if available */}
+                {kitchenConfig?.directions && (
+                  <div className="flex items-start gap-3 bg-white/10 p-4 rounded-[20px] border border-white/10 backdrop-blur-sm mt-1">
+                    <Navigation size={18} className="shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground/80 mb-1">Cách đi tới bếp</p>
+                      <p className="text-sm font-medium leading-relaxed italic opacity-90">
+                        {kitchenConfig?.directions}
+                      </p>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </motion.section>
+          )}
+
+          {/* Order Completed Message */}
+          {todayOrder && todayOrder.status === 'done' && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mx-0 p-4 rounded-2xl bg-destructive/5 border border-destructive/10 flex items-start gap-3 mb-6"
+            >
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                <CircleCheckBig size={18} className="text-destructive" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-sm font-bold text-destructive">Bé đã hoàn thành bữa ăn</p>
+                <p className="text-[11px] text-destructive/70 leading-relaxed font-medium">Bé đã hoàn thành bữa ăn hôm nay! Bé có thể xem lại món đã ăn nhưng không thể thay đổi.</p>
+              </div>
+            </motion.div>
           )}
 
           {/* Weekly Menu Section */}
@@ -770,6 +796,39 @@ export default function KidsHome() {
                 Thực đơn tuần này
               </h2>
               <p className="text-xs md:text-[13px] font-normal text-muted-foreground">Khám phá món ngon trong tuần của bé</p>
+            </div>
+
+            {/* Category Filter */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth mb-6 pb-2">
+              <button
+                onClick={() => setSelectedCategoryId('All')}
+                className={`px-4 py-1.5 rounded-full text-[12px] font-bold whitespace-nowrap transition-all border shrink-0 ${
+                  selectedCategoryId === 'All' 
+                    ? 'bg-primary text-primary-foreground border-primary shadow-sm shadow-primary/20' 
+                    : 'bg-white text-muted-foreground border-border hover:bg-secondary'
+                }`}
+              >
+                Tất cả
+              </button>
+              {activeCategoriesInMenu.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategoryId(cat.id!)}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-[12px] font-bold whitespace-nowrap transition-all border shrink-0 ${
+                    selectedCategoryId === cat.id 
+                      ? 'border-transparent shadow-md' 
+                      : 'bg-white text-muted-foreground border-border hover:bg-secondary shadow-sm'
+                  }`}
+                  style={selectedCategoryId === cat.id ? { 
+                    backgroundColor: cat.color, 
+                    color: 'white',
+                    borderColor: 'transparent'
+                  } : {}}
+                >
+                  <span>{cat.emoji}</span>
+                  <span>{cat.name}</span>
+                </button>
+              ))}
             </div>
 
             {streak === 0 && !loading && (
@@ -785,12 +844,15 @@ export default function KidsHome() {
             )}
             
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-6">
-              {daysMenu.length === 0 ? (
-                <div className="col-span-full py-12 text-center bg-secondary rounded-[40px] border border-dashed border-border">
-                  <p className="text-muted-foreground font-bold">Sắp có thực đơn mới rồi nè!</p>
+              {filteredDaysMenu.length === 0 ? (
+                <div className="col-span-full py-12 text-center bg-secondary/50 rounded-[40px] border border-dashed border-border flex flex-col items-center gap-3">
+                  <span className="text-4xl opacity-50">😊</span>
+                  <p className="text-muted-foreground font-bold">
+                    Tuần này chưa có {selectedCategoryId !== 'All' ? categories.find(c => c.id === selectedCategoryId)?.name : 'món ăn'} nào trong danh mục này nè!
+                  </p>
                 </div>
               ) : (
-                daysMenu.map((day, idx) => (
+                filteredDaysMenu.map((day, idx) => (
                   <motion.div 
                     key={`${day.dayLabel}-${idx}`}
                     whileHover={{ y: -8 }}
@@ -913,47 +975,59 @@ export default function KidsHome() {
               </div>
             </div>
             <div className="flex-1 p-6 space-y-4 pb-20 md:pb-8">
-              {selectedDayMenu.meals.map(meal => (
-                <div 
-                  key={meal.id}
-                  onClick={() => {
-                    setSelectedRecipe(meal);
-                    setSelectedDayMenu(null);
-                  }}
-                  className="w-full bg-card p-4 rounded-3xl border border-border flex items-center gap-4 hover:border-primary/30 hover:bg-secondary/10 transition-all group cursor-pointer"
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-secondary shrink-0 relative">
-                    {meal.imageUrl ? (
-                      <img src={getOptimizedUrl(meal.imageUrl, 200)} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                        <UtensilsCrossed size={24} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 text-left">
-                    <h4 className="font-bold text-foreground text-[15px] group-hover:text-primary transition-colors">{meal.title}</h4>
-                    <div className="flex items-center gap-3 mt-1">
-                      <div className="flex items-center gap-1 text-orange-400">
-                        <Star size={12} className="fill-orange-400" />
-                        <span className="text-xs font-bold text-muted-foreground">{meal.avgRating?.toFixed(1) || '5.0'}</span>
-                      </div>
-                      {meal.favoriteCount !== undefined && (
-                        <div className="flex items-center gap-1">
-                          <Heart size={12} className="fill-destructive text-destructive" />
-                          <span className="text-[10px] font-bold text-muted-foreground">{meal.favoriteCount}</span>
+              {selectedDayMenu.meals.map(meal => {
+                const mealCat = meal.categoryId ? getCategoryById(meal.categoryId) : null;
+                return (
+                  <div 
+                    key={meal.id}
+                    onClick={() => {
+                      setSelectedRecipe(meal);
+                      setSelectedDayMenu(null);
+                    }}
+                    className="w-full bg-card p-4 rounded-3xl border border-border flex items-center gap-4 hover:border-primary/30 hover:bg-secondary/10 transition-all group cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="w-16 h-16 rounded-2xl overflow-hidden bg-secondary shrink-0 relative">
+                      {meal.imageUrl ? (
+                        <img src={getOptimizedUrl(meal.imageUrl, 200)} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                          <UtensilsCrossed size={24} />
                         </div>
                       )}
                     </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <h4 className="font-bold text-foreground text-[15px] group-hover:text-primary transition-colors truncate">{meal.title}</h4>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        {mealCat && (
+                          <span 
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm border border-transparent"
+                            style={{ backgroundColor: `${mealCat.color}15`, color: mealCat.color }}
+                          >
+                            <span>{mealCat.emoji}</span>
+                            <span>{mealCat.name}</span>
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1 text-orange-400">
+                          <Star size={12} className="fill-orange-400" />
+                          <span className="text-xs font-bold text-muted-foreground">{meal.avgRating?.toFixed(1) || '5.0'}</span>
+                        </div>
+                        {meal.favoriteCount !== undefined && (
+                          <div className="flex items-center gap-1 pl-1 border-l border-border">
+                            <Heart size={12} className="fill-destructive text-destructive" />
+                            <span className="text-[10px] font-bold text-muted-foreground">{meal.favoriteCount}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      <HeartButton recipeId={meal.id!} size={32} />
+                      <ChevronRight size={20} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <HeartButton recipeId={meal.id!} size={32} />
-                    <ChevronRight size={20} className="text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

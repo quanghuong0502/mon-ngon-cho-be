@@ -37,8 +37,9 @@ import {
   Heart,
   SortAsc
 } from 'lucide-react';
-import { Review } from '../../types';
+import { Review, Category } from '../../types';
 import ConfirmModal from '../../components/ConfirmModal';
+import { useCategory } from '../../context/CategoryContext';
 
 interface RecipeDetailModalProps {
   recipe: Recipe;
@@ -49,6 +50,8 @@ interface RecipeDetailModalProps {
 function RecipeDetailModal({ recipe, onClose, onEdit }: RecipeDetailModalProps) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
+  const { getCategoryById } = useCategory();
+  const category = recipe.categoryId ? getCategoryById(recipe.categoryId) : null;
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -115,6 +118,15 @@ function RecipeDetailModal({ recipe, onClose, onEdit }: RecipeDetailModalProps) 
             }`}>
               {recipe.isPublished ? 'Công khai' : 'Nháp'}
             </span>
+            {category && (
+              <span 
+                className="px-2 md:px-3 py-1 text-[9px] md:text-[10px] font-bold rounded-full uppercase border shadow-sm flex items-center gap-1"
+                style={{ backgroundColor: `${category.color}15`, color: category.color, borderColor: `${category.color}30` }}
+              >
+                <span>{category.emoji}</span>
+                <span>{category.name}</span>
+              </span>
+            )}
             {recipe.tags?.map(tag => (
               <span key={tag} className="px-2 md:px-3 py-1 bg-primary/10 text-primary text-[9px] md:text-[10px] font-bold rounded-full uppercase border border-primary/20">
                 {tag}
@@ -124,6 +136,12 @@ function RecipeDetailModal({ recipe, onClose, onEdit }: RecipeDetailModalProps) 
 
           <h2 className="text-[22px] md:text-[28px] font-bold text-foreground mb-1.5 md:mb-2 leading-tight">{recipe.title}</h2>
           
+          {recipe.shortDescription && (
+            <p className="text-[14px] text-muted-foreground italic mb-4 font-medium leading-relaxed">
+              {recipe.shortDescription}
+            </p>
+          )}
+
           <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-4 md:mb-6 text-muted-foreground">
             <div className="flex items-center gap-0.5">
               {[...Array(5)].map((_, i) => (
@@ -143,6 +161,10 @@ function RecipeDetailModal({ recipe, onClose, onEdit }: RecipeDetailModalProps) 
               <span className="text-xs md:text-sm font-bold text-foreground">{recipe.favoriteCount || 0}</span>
             </div>
           </div>
+
+          <p className="text-[14px] md:text-[15px] text-muted-foreground leading-relaxed mb-6">
+            {recipe.description}
+          </p>
 
           <div className="h-px bg-border mb-6 md:mb-8" />
 
@@ -237,9 +259,11 @@ export default function RecipeList() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState('All');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<'All' | string>('All');
   const [sortBy, setSortBy] = useState<'newest' | 'popular'>('newest');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [viewingRecipe, setViewingRecipe] = useState<Recipe | null>(null);
+  const { categories, getCategoryById } = useCategory();
   const navigate = useNavigate();
 
   useLockBodyScroll(!!deleteConfirm || !!viewingRecipe);
@@ -276,7 +300,8 @@ export default function RecipeList() {
   const filteredRecipes = recipes.filter(r => {
     const matchesSearch = r.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTag = selectedTag === 'All' || r.tags?.includes(selectedTag);
-    return matchesSearch && matchesTag;
+    const matchesCategory = selectedCategoryId === 'All' || r.categoryId === selectedCategoryId;
+    return matchesSearch && matchesTag && matchesCategory;
   }).sort((a, b) => {
     if (sortBy === 'popular') {
       return (b.favoriteCount || 0) - (a.favoriteCount || 0);
@@ -341,6 +366,38 @@ export default function RecipeList() {
               ))}
             </div>
           </div>
+          
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth">
+            <button
+              onClick={() => setSelectedCategoryId('All')}
+              className={`px-4 py-2 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border shrink-0 ${
+                selectedCategoryId === 'All' 
+                  ? 'bg-primary text-primary-foreground border-primary' 
+                  : 'bg-secondary/50 text-muted-foreground border-border/50 hover:bg-secondary'
+              }`}
+            >
+              Tất cả DM
+            </button>
+            {categories.filter(c => c.isActive).map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategoryId(cat.id!)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border shrink-0 ${
+                  selectedCategoryId === cat.id 
+                    ? 'border-transparent shadow-sm' 
+                    : 'bg-secondary/50 text-muted-foreground border-border/50 hover:bg-secondary'
+                }`}
+                style={selectedCategoryId === cat.id ? { 
+                  backgroundColor: `${cat.color}15`, 
+                  color: cat.color,
+                  borderColor: `${cat.color}30`
+                } : {}}
+              >
+                <span>{cat.emoji}</span>
+                <span>{cat.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -395,12 +452,24 @@ export default function RecipeList() {
                       <span className="text-[10px] font-bold uppercase tracking-wider">Chưa có ảnh</span>
                     </div>
                   )}
-                  <div className="absolute top-2 left-2">
+                  <div className="absolute top-2 left-2 flex flex-col gap-1">
                     <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest shadow-sm ${
                       recipe.isPublished ? 'bg-green-500 text-white' : 'bg-muted-foreground text-white'
                     }`}>
                       {recipe.isPublished ? 'Công khai' : 'Nháp'}
                     </span>
+                    {recipe.categoryId && getCategoryById(recipe.categoryId) && (
+                      <span 
+                        className="px-2 py-0.5 rounded-md text-[9px] font-bold uppercase shadow-sm border"
+                        style={{ 
+                          backgroundColor: `${getCategoryById(recipe.categoryId)!.color}F0`, 
+                          color: 'white',
+                          borderColor: 'transparent'
+                        }}
+                      >
+                        {getCategoryById(recipe.categoryId)!.emoji} {getCategoryById(recipe.categoryId)!.name}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -410,6 +479,12 @@ export default function RecipeList() {
                       {recipe.title}
                     </h3>
                     
+                    {recipe.shortDescription && (
+                      <p className="text-[12px] text-muted-foreground line-clamp-1 italic font-medium">
+                        {recipe.shortDescription}
+                      </p>
+                    )}
+
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1">
                         <Star size={12} className="fill-orange-400 text-orange-400" />

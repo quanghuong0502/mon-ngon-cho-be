@@ -17,11 +17,12 @@ import {
 import { db } from '../../lib/firebase';
 import { uploadToCloudinary, getOptimizedUrl } from '../../lib/cloudinary';
 import { sendPushToUser, getAllKidOneSignalIds } from '../../lib/oneSignal';
-import { Recipe } from '../../types';
+import { Recipe, Category } from '../../types';
 import { getSession } from '../../lib/auth';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 import ConfirmModal from '../../components/ConfirmModal';
+import { useCategory } from '../../context/CategoryContext';
 import { 
   ArrowLeft, 
   Upload, 
@@ -33,7 +34,8 @@ import {
   X,
   CheckCircle2,
   AlertTriangle,
-  Star
+  Star,
+  Link as LinkIcon
 } from 'lucide-react';
 
 interface Ingredient {
@@ -47,6 +49,7 @@ export default function RecipeEditor() {
   const navigate = useNavigate();
   const session = getSession();
   const isNew = !id || id === 'new';
+  const { categories } = useCategory();
   
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -56,6 +59,8 @@ export default function RecipeEditor() {
   const isInitialMount = useRef(true);
   
   const [title, setTitle] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [shortDescription, setShortDescription] = useState('');
   const [description, setDescription] = useState('');
   const [ingredients, setIngredients] = useState<Ingredient[]>([{ amount: '', unit: '', name: '' }]);
   const [steps, setSteps] = useState<string[]>(['']);
@@ -89,7 +94,7 @@ export default function RecipeEditor() {
     if (!loading && !isInitialMount.current) {
       setIsDirty(true);
     }
-  }, [title, description, ingredients, steps, tags, reviewTags, isPublished, imageFile]);
+  }, [title, categoryId, shortDescription, description, ingredients, steps, tags, reviewTags, isPublished, imageFile]);
 
   // Auto-save logic
   useEffect(() => {
@@ -109,6 +114,8 @@ export default function RecipeEditor() {
       if (docSnap.exists()) {
         const data = docSnap.data() as Recipe;
         setTitle(data.title);
+        setCategoryId(data.categoryId || '');
+        setShortDescription(data.shortDescription || '');
         setDescription(data.description);
         setIngredients(data.ingredients.map(item => {
           const parts = item.split(' ');
@@ -183,6 +190,8 @@ export default function RecipeEditor() {
 
       const recipeData: any = {
         title,
+        categoryId,
+        shortDescription,
         description,
         ingredients: formattedIngredients,
         steps: steps.filter(s => s.trim()),
@@ -451,13 +460,70 @@ console.log(newsContent)
                       className="w-full px-4 py-3 bg-secondary border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-sm text-foreground"
                     />
                   </div>
+
                   <div>
-                    <label className="block text-[12px] font-medium text-muted-foreground mb-1.5 px-0.5">Mô tả ngắn</label>
+                    <div className="flex items-center justify-between mb-2 px-0.5">
+                      <label className="block text-[12px] font-medium text-muted-foreground">Danh mục <span className="text-destructive">*</span></label>
+                      {categories.length === 0 && (
+                        <button 
+                          onClick={() => navigate('/chef/settings')}
+                          className="text-[10px] text-primary font-bold hover:underline"
+                        >
+                          Chưa có danh mục. Tạo trong Cài đặt →
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar">
+                      {categories.filter(c => c.isActive || c.id === categoryId).map(cat => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            setCategoryId(cat.id!);
+                            setIsDirty(true);
+                          }}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-[12px] font-bold transition-all shrink-0 ${
+                            categoryId === cat.id 
+                              ? 'border-transparent shadow-sm' 
+                              : 'bg-white border-border text-muted-foreground hover:border-primary/50'
+                          }`}
+                          style={categoryId === cat.id ? { 
+                            backgroundColor: `${cat.color}15`, 
+                            color: cat.color,
+                            borderColor: `${cat.color}30`
+                          } : {}}
+                        >
+                          <span>{cat.emoji}</span>
+                          <span>{cat.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5 px-0.5">
+                      <label className="block text-[12px] font-medium text-muted-foreground">Mô tả ngắn</label>
+                      <span className={`text-[10px] font-bold ${shortDescription.length >= 60 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                        {shortDescription.length}/60
+                      </span>
+                    </div>
+                    <input 
+                      type="text" 
+                      maxLength={60}
+                      value={shortDescription}
+                      onChange={e => setShortDescription(e.target.value)}
+                      placeholder="VD: Trứng chiên hành lá thơm ngon, giàu dinh dưỡng... (tối đa 60 ký tự)"
+                      className="w-full px-4 py-3 bg-secondary border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all text-sm text-foreground"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[12px] font-medium text-muted-foreground mb-1.5 px-0.5">Mô tả chi tiết</label>
                     <textarea 
                       rows={3}
                       value={description}
                       onChange={e => setDescription(e.target.value)}
-                      placeholder="Món ăn giàu Omega-3, tốt cho não bộ của bé..."
+                      placeholder="Mô tả đầy đủ về món ăn, cách chế biến, giá trị dinh dưỡng..."
                       className="w-full px-4 py-3 bg-secondary border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all resize-none text-sm text-foreground"
                     />
                   </div>

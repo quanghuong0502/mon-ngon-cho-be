@@ -62,6 +62,8 @@ import KidsProfile from './pages/kids/Profile';
 import { FavoritesProvider } from './context/FavoritesContext';
 import { useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import PushNotificationHandler from './components/PushNotificationHandler';
+import { CategoryProvider } from './context/CategoryContext';
 
 function KidRoutes() {
   const { user } = useAuth();
@@ -90,7 +92,9 @@ export default function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
-        <BrowserRouter>
+        <CategoryProvider>
+          <BrowserRouter>
+          <PushNotificationHandler />
           <Toaster 
             position="top-center"
             toastOptions={{
@@ -134,6 +138,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </BrowserRouter>
+        </CategoryProvider>
       </ThemeProvider>
     </AuthProvider>
   );

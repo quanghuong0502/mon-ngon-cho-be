@@ -150,17 +150,68 @@ export default function MenuBuilder() {
     }
   };
 
+  const buildMenuUpdateMessage = (changedDays: string[], slots: Record<string, string[]>, recipes: Recipe[]) => {
+    if (changedDays.length === 1) {
+      const day = changedDays[0];
+      const dayLabel = ALL_DAYS.find(d => d.key === day)?.label;
+      const dayRecipeIds = slots[day] || [];
+      const dayRecipes = dayRecipeIds.map(id => recipes.find(r => r.id === id)).filter(Boolean);
+      const names = dayRecipes.map(r => r?.title);
+
+      if (names.length === 1) {
+        return `${dayLabel} có món "${names[0]}" mới. Bé đặt ngay nhé! 🍽️`;
+      } else if (names.length > 1) {
+        return `${dayLabel} có ${names.length} món mới: ${names.join(', ')}. Bé chọn ngay nhé!`;
+      }
+    }
+    
+    const changedLabels = changedDays.map(day => ALL_DAYS.find(d => d.key === day)?.label).filter(Boolean);
+    if (changedDays.length <= 3) {
+      return `Thực đơn ${changedLabels.join(', ')} vừa được cập nhật. Bé xem ngay nhé! 👀`;
+    }
+    
+    return `Thực đơn tuần này vừa được cập nhật (${changedDays.length} ngày). Bé xem ngay nhé! 🍱`;
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      const slots: any = {};
+      const menuRef = doc(db, 'weeklyMenu', weekId);
+      const oldSnap = await getDoc(menuRef);
+      const oldSlots = oldSnap.exists() ? (oldSnap.data().slots || {}) : {};
+
+      const slots: Record<string, string[]> = {};
       ALL_DAYS.forEach(day => {
         slots[day.key] = (menuData[day.key] || []).map(r => r.id);
       });
-      await setDoc(doc(db, 'weeklyMenu', weekId), {
+
+      // Find changed days
+      const changedDays = ALL_DAYS.filter(day => {
+        const oldIds = oldSlots[day.key] || [];
+        const newIds = slots[day.key] || [];
+        if (oldIds.length !== newIds.length) return true;
+        return oldIds.some((id: string, i: number) => id !== newIds[i]);
+      }).map(d => d.key);
+
+      await setDoc(menuRef, {
         weekStart: format(currentWeek, 'yyyy-MM-dd'),
         slots
       });
+
+      if (changedDays.length > 0) {
+        const { getAllKidOneSignalIds, sendPushToUser } = await import('../../lib/oneSignal');
+        const kidIds = await getAllKidOneSignalIds();
+        if (kidIds.length > 0) {
+          const body = buildMenuUpdateMessage(changedDays, slots, recipes);
+          await sendPushToUser(
+            kidIds,
+            'Thực đơn mới cho bé! ✨',
+            body,
+            '/kids/order'
+          );
+        }
+      }
+
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {

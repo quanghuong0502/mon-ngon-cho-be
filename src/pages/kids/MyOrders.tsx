@@ -55,7 +55,8 @@ import {
   ChevronLeft,
   TrendingUp,
   Calendar,
-  Maximize2
+  Maximize2,
+  Pencil
 } from 'lucide-react';
 import { format, startOfWeek, addDays, getWeek } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -74,9 +75,10 @@ interface ReviewModalProps {
   existingReview?: Review;
   onClose: () => void;
   onSuccess: () => void;
+  onImageClick?: (images: string[], index: number) => void;
 }
 
-function ReviewModal({ recipes, orderId, orderDate, orderDay, user, existingReview, onClose, onSuccess }: ReviewModalProps) {
+function ReviewModal({ recipes, orderId, orderDate, orderDay, user, existingReview, onClose, onSuccess, onImageClick }: ReviewModalProps) {
   const [rating, setRating] = useState(existingReview?.rating || 0);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState(existingReview?.comment || '');
@@ -307,11 +309,11 @@ function ReviewModal({ recipes, orderId, orderDate, orderDay, user, existingRevi
           {isReadOnly ? 'Đánh giá đơn hàng' : 'Bé thấy bữa ăn thế nào?'}
         </h2>
         <div className="flex flex-col mt-0.5">
-          <p className="text-[14px] font-black text-primary leading-tight">
-            Đơn hàng ngày {format(orderDate, 'dd/MM')}
-          </p>
+         
           <p className="text-[12px] font-medium text-muted-foreground mt-0.5">
-            {orderDay}, {recipes.length} món
+            {orderDay} ngày {format(orderDate, 'dd/MM')},  <span className="text-[14px] font-black text-primary leading-tight">
+            {recipes.length} món
+          </span>
           </p>
         </div>
       </div>
@@ -412,9 +414,14 @@ function ReviewModal({ recipes, orderId, orderDate, orderDay, user, existingRevi
                   <label className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-1.5 block mb-2">Ảnh của bé</label>
                   <div className="flex flex-wrap gap-2">
                     {previews.map((preview, i) => (
-                      <div key={i} className="relative w-20 h-20 rounded-2xl overflow-hidden shadow-sm border border-border">
+                      <motion.div 
+                        key={i} 
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => onImageClick?.(previews, i)}
+                        className="relative w-20 h-20 rounded-2xl overflow-hidden shadow-sm border border-border cursor-pointer active:opacity-80"
+                      >
                         <img src={getOptimizedUrl(preview, 300)} className="w-full h-full object-cover" />
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 </div>
@@ -524,11 +531,13 @@ export default function MyOrders() {
   const [kitchenConfig, setKitchenConfig] = useState<any>(null);
   const [isKitchenOpen, setIsKitchenOpen] = useState(false);
   const [reviewingMeal, setReviewingMeal] = useState<{ recipes: Recipe[], orderId: string, orderDate: Date, orderDay: string } | null>(null);
-  const [selectedImages, setSelectedImages] = useState<string[] | null>(null);
+  const [previewImages, setPreviewImages] = useState<string[] | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number>(0);
+  const [direction, setDirection] = useState(0);
   const [weekIdx, setWeekIdx] = useState(0);
   const [reviewFilter, setReviewFilter] = useState<'all' | 'unreviewed' | 'reviewed'>('all');
 
-  useLockBodyScroll(!!reviewingMeal || !!selectedImages);
+  useLockBodyScroll(!!reviewingMeal || !!previewImages);
 
   useEffect(() => {
     if (!user) return;
@@ -732,9 +741,9 @@ export default function MyOrders() {
         };
       case 'cancelled':
         return { 
-          icon: <div className="w-2 h-2 rounded-full bg-muted-foreground/20" />,
-          label: 'Đã huỷ', 
-          color: 'text-muted-foreground bg-secondary opacity-60',
+          icon: <div className="w-2 h-2 rounded-full bg-destructive/50" />,
+          label: 'Đã bị huỷ', 
+          color: 'text-destructive bg-destructive/10 border-destructive/20 font-black',
         };
       default:
         return {
@@ -864,37 +873,42 @@ export default function MyOrders() {
                   const review = reviews[order.id!];
                   const hasReview = !!review;
 
-                  return (
-                    <motion.div 
-                      key={order.id}
-                      layout
-                      className={`bg-card rounded-[32px] border p-4 md:p-6 shadow-sm hover:shadow-md transition-all group overflow-hidden ${
-                        isActive ? 'border-primary border-2' : 'border-border'
-                      }`}
-                    >
+                    return (
+                      <motion.div 
+                        key={order.id}
+                        layout
+                        className={`bg-card rounded-[32px] border p-4 md:p-6 shadow-sm hover:shadow-md transition-all group overflow-hidden relative ${
+                          isActive ? 'border-primary border-2' : 
+                          order.status === 'cancelled' && order.cancelledBy === 'chef' ? 'border-destructive/30 bg-destructive/[0.02]' :
+                          'border-border'
+                        }`}
+                      >
+                        {order.status === 'cancelled' && order.cancelledBy === 'chef' && (
+                          <div className="absolute top-0 right-0 left-0 h-1 bg-destructive/20" />
+                        )}
                       <div className="flex items-center justify-between mb-4">
-                        <div className="flex flex-col">
+                        <div className="flex-1 flex items-center justify-between">
                           <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">{dayLabel}</span>
                           {isReviewsPage && (
-                            <div className="mt-1">
+                            <div>
                               {hasReview ? (
                                 <div className="flex items-center gap-1 bg-secondary px-3 py-1.5 rounded-xl text-primary font-black text-[10px] uppercase tracking-wider w-fit">
                                   <Star size={12} className="fill-current" />
-                                  Đã đánh giá
+                                  ĐÃ ĐÁNH GIÁ
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-1 bg-secondary px-3 py-1.5 rounded-xl text-muted-foreground font-black text-[10px] uppercase tracking-wider w-fit">
                                   <Star size={12} className="fill-current" />
-                                  Chưa đánh giá
+                                  CHƯA ĐÁNH GIÁ
                                 </div>
                               )}
                             </div>
                           )}
                         </div>
                         {!isReviewsPage && (
-                          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl ${statusInfo.color}`}>
+                          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${statusInfo.color}`}>
                             {statusInfo.icon}
-                            <span className={`text-[10px] font-black uppercase tracking-wider ${order.status === 'cancelled' ? 'line-through' : ''}`}>{statusInfo.label}</span>
+                            <span className={`text-[10px] font-black uppercase tracking-wider`}>{statusInfo.label}</span>
                           </div>
                         )}
                       </div>
@@ -912,7 +926,16 @@ export default function MyOrders() {
                                 )}
                               </div>
                               <div className="flex flex-col justify-center min-w-0 flex-1">
-                                <h4 className={`font-medium text-foreground text-base mb-1 truncate leading-tight ${order.status === 'cancelled' ? 'line-through text-muted-foreground' : ''}`}>{recipe?.title || 'Đang tải...'}</h4>
+                                <h4 className={`font-medium text-foreground text-base mb-1 truncate leading-tight ${order.status === 'cancelled' ? 'text-muted-foreground' : ''}`}>{recipe?.title || 'Đang tải...'}</h4>
+                                {(() => {
+                                  const subtitle = recipe?.shortDescription || recipe?.description?.slice(0, 60) || '';
+                                  if (!subtitle) return null;
+                                  return (
+                                    <p className="text-[11px] text-muted-foreground line-clamp-1 mb-1 font-medium italic">
+                                      {subtitle}
+                                    </p>
+                                  );
+                                })()}
                                 <p className="text-[12px] text-muted-foreground">
                                   {(() => {
                                     const itemTime = order.itemAddedAt?.[rid] || order.createdAt;
@@ -926,9 +949,28 @@ export default function MyOrders() {
                         );
                       })}
 
+                      {order.status === 'cancelled' && order.cancelledBy === 'chef' && (
+                        <div className="mt-4 space-y-3">
+                          <div className="p-4 rounded-2xl bg-destructive/[0.03] border border-destructive/10">
+                            <div className="text-[11px] font-black text-muted-foreground uppercase tracking-widest mb-1.5">Lý do huỷ món</div>
+                            <div className="text-sm text-destructive font-bold italic leading-relaxed">
+                              "{order.cancelReason || 'Đầu bếp chưa ghi lý do'}"
+                            </div>
+                            {order.cancelledAt && (
+                              <div className="text-[10px] text-muted-foreground mt-2 font-medium">
+                                Huỷ lúc {format(order.cancelledAt.toDate(), 'HH:mm', { locale: vi })}
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-[12px] text-muted-foreground/60 italic font-medium px-1">
+                            Đầu bếp xin lỗi vì sự bất tiện này! 🙏
+                          </p>
+                        </div>
+                      )}
+
                       {isReviewsPage && hasReview && (
                         <div className="mt-4 pt-4 border-t border-border">
-                          <div className="flex items-center gap-1 mb-3">
+                          <div className="flex items-center gap-1">
                             {[1, 2, 3, 4, 5].map(star => (
                               <Star 
                                 key={star} 
@@ -936,11 +978,33 @@ export default function MyOrders() {
                                 className={star <= (review?.rating || 0) ? 'text-primary fill-primary' : 'text-muted/20 fill-muted/5'} 
                               />
                             ))}
-                            <span className="ml-2 text-base font-bold text-primary">{review.rating}</span>
                           </div>
                           {review.comment && (
-                            <div className="p-4 bg-primary/5 rounded-2xl text-[13px] text-foreground/80 font-medium italic border border-primary/10">
+                            <div className="p-3.5 bg-primary/5 rounded-2xl text-[13px] text-foreground/80 font-medium italic border border-primary/10 truncate mt-4 mb-4">
                               "{review.comment}"
+                            </div>
+                          )}
+
+                          {review.imageUrls && review.imageUrls.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {review.imageUrls.slice(0, 2).map((url, i) => {
+                                const isLastShow = i === 1 && review.imageUrls!.length > 2;
+                                const remainingCount = review.imageUrls!.length - 2;
+                                
+                                return (
+                                  <div
+                                    key={i}
+                                    className="relative w-16 h-16 rounded-xl overflow-hidden border border-border shadow-sm"
+                                  >
+                                    <img src={getOptimizedUrl(url, 200)} className="w-full h-full object-cover" />
+                                    {isLastShow && (
+                                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-black text-xs">
+                                        +{remainingCount}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -955,16 +1019,21 @@ export default function MyOrders() {
                               orderDate: order.createdAt.toDate(),
                               orderDay: dayLabel
                             })}
-                            className={`w-full h-12 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all border-2 flex items-center justify-center gap-2 ${
+                            className={`w-full h-12 rounded-2xl text-[11px] font-black tracking-widest transition-all border-2 flex items-center justify-center gap-2 ${
                               hasReview 
                               ? 'border-border text-muted-foreground hover:bg-secondary' 
-                              : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground shadow-lg shadow-primary-shadow/30'
+                              : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground shadow-lg shadow-primary-shadow/30 uppercase'
                             }`}
                           >
-                            {hasReview ? 'Xem lại đánh giá' : (
+                            {hasReview ? (
+                              <>
+                                <Pencil size={14} />
+                                Xem lại đánh giá
+                              </>
+                            ) : (
                               <>
                                 <Star size={14} className="fill-current" />
-                                Đánh giá ngay
+                                ĐÁNH GIÁ NGAY
                               </>
                             )}
                           </button>
@@ -1001,7 +1070,6 @@ export default function MyOrders() {
                                     : 'bg-muted text-muted-foreground cursor-not-allowed'
                                 }`}
                               >
-                                <Navigation size={16} />
                                 Bé đang đến lấy!
                               </button>
                             )}
@@ -1043,33 +1111,81 @@ export default function MyOrders() {
           )}
         </div>
 
-      {/* Photo View Modal */}
+      {/* Photo View Slider */}
       <AnimatePresence>
-        {selectedImages && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-background/90 backdrop-blur-md" onClick={() => setSelectedImages(null)}>
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full max-w-4xl flex flex-col gap-4"
-              onClick={e => e.stopPropagation()}
-            >
-              <button 
-                onClick={() => setSelectedImages(null)}
-                className="modal-close-btn"
-                aria-label="Close"
-              >
-                <X size={20} />
-              </button>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {selectedImages.map((url, i) => (
-                   <div key={i} className="aspect-square rounded-3xl overflow-hidden shadow-2xl border-4 border-card">
-                    <img src={getOptimizedUrl(url, 600)} className="w-full h-full object-cover" />
-                  </div>
-                ))}
+        {previewImages && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            className="fixed inset-0 z-[200] flex flex-col bg-background/95 backdrop-blur-xl" 
+            onClick={() => setPreviewImages(null)}
+          >
+            {/* Header with counter */}
+            <div className="relative z-10 flex items-center justify-center p-6 w-full">
+              <div className="bg-black/20 backdrop-blur-md px-4 py-1.5 rounded-full text-white text-sm font-black tracking-widest border border-white/10">
+                {previewIndex + 1} / {previewImages.length}
               </div>
-            </motion.div>
-          </div>
+            </div>
+
+            {/* Slider Content */}
+            <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+              <AnimatePresence mode="wait" initial={false} custom={direction}>
+                <motion.div
+                  key={previewIndex}
+                  custom={direction}
+                  variants={{
+                    enter: (dir: number) => ({ x: dir > 0 ? '100%' : dir < 0 ? '-100%' : 0, opacity: 0, scale: 0.9 }),
+                    center: { x: 0, opacity: 1, scale: 1 },
+                    exit: (dir: number) => ({ x: dir > 0 ? '-100%' : dir < 0 ? '100%' : 0, opacity: 0, scale: 0.9 }),
+                  }}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  onDragEnd={(_, info) => {
+                    if (info.offset.x > 50 && previewIndex > 0) {
+                      setDirection(-1);
+                      setPreviewIndex(prev => prev - 1);
+                    } else if (info.offset.x < -50 && previewIndex < previewImages.length - 1) {
+                      setDirection(1);
+                      setPreviewIndex(prev => prev + 1);
+                    }
+                  }}
+                  className="w-full h-full max-w-4xl p-6 flex items-center justify-center"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <img 
+                    src={getOptimizedUrl(previewImages[previewIndex], 1200)} 
+                    className="max-w-full max-h-full object-contain rounded-3xl shadow-2xl select-none pointer-events-none" 
+                  />
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Thumbnails Footer */}
+            <div className="p-8 flex justify-center gap-3 overflow-x-auto scrollbar-hide w-full max-w-lg mx-auto">
+              {previewImages.map((url, i) => (
+                <motion.button
+                  key={i}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={(e) => { 
+                    e.stopPropagation();
+                    setDirection(i > previewIndex ? 1 : -1);
+                    setPreviewIndex(i); 
+                  }}
+                  className={`relative w-12 h-12 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${
+                    previewIndex === i ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-40'
+                  }`}
+                >
+                  <img src={getOptimizedUrl(url, 200)} className="w-full h-full object-cover" />
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -1085,6 +1201,11 @@ export default function MyOrders() {
             existingReview={reviews[reviewingMeal.orderId]}
             onClose={() => setReviewingMeal(null)}
             onSuccess={() => setReviewingMeal(null)}
+            onImageClick={(images, index) => {
+              setDirection(0);
+              setPreviewImages(images);
+              setPreviewIndex(index);
+            }}
           />
         )}
       </AnimatePresence>

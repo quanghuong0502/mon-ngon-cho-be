@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, updateDoc, setDoc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
-import { uploadToCloudinary } from '../../lib/cloudinary';
+import { uploadToCloudinary, getOptimizedUrl } from '../../lib/cloudinary';
 import { sendPushToUser } from '../../lib/oneSignal';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -107,6 +107,7 @@ export default function Profile() {
   const [achievements, setAchievements] = useState<AchievementRule[]>([]);
   const [unlockedIds, setUnlockedIds] = useState<Record<string, UnlockedInfo>>({});
   const [selectedAchievement, setSelectedAchievement] = useState<AchievementRule | null>(null);
+  const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isUnlockingRef = useRef<Record<string, boolean>>({});
   const navigate = useNavigate();
@@ -727,9 +728,13 @@ export default function Profile() {
         {/* Avatar Section */}
         <div className="flex flex-col items-center mb-4">
           <div className="relative">
-            <div className="rounded-full p-1 border-[3px] border-primary">
+            <motion.div 
+              whileTap={{ scale: 0.95 }}
+              onClick={() => profile.avatar && setPreviewAvatar(profile.avatar)}
+              className="rounded-full p-1 border-[3px] border-primary cursor-pointer active:scale-95 transition-all"
+            >
               <Avatar src={profile.avatar} name={profile.name} size={96} />
-            </div>
+            </motion.div>
             {uploading && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm rounded-full text-foreground border-[3px] border-primary scale-105 z-10">
                 <Loader2 className="w-8 h-8 animate-spin text-primary mb-1" />
@@ -867,6 +872,33 @@ export default function Profile() {
         </div>
       </div>
 
+      {/* Avatar Preview Lightbox */}
+      <AnimatePresence>
+        {previewAvatar && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/30 backdrop-blur-md"
+            onClick={() => setPreviewAvatar(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="max-w-full max-h-[70vh] aspect-square rounded-[40px] overflow-hidden border-4 border-white/20 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={getOptimizedUrl(previewAvatar, 1200)}
+                alt="Avatar Preview"
+                className="w-full h-full object-cover"
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {selectedAchievement && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -881,19 +913,54 @@ export default function Profile() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-card w-full max-w-[340px] rounded-[32px] shadow-2xl relative overflow-hidden"
+              className="bg-card w-full max-w-[340px] rounded-[32px] shadow-2xl relative overflow-y-auto max-h-[90vh] pb-6 border-2 border-orange-500/20"
             >
-              <div className="p-8 flex flex-col items-center text-center">
-                <div className={`text-5xl mb-6 flex items-center justify-center w-20 h-20 rounded-3xl ${
-                  (!!unlockedIds[selectedAchievement.id] || getAchievementProgress(selectedAchievement).every(p => p.isDone)) 
-                    ? 'bg-primary/10' 
-                    : 'bg-secondary grayscale opacity-50'
-                }`}>
-                  {selectedAchievement.emoji}
+              <div className="p-8 pb-10 flex flex-col items-center text-center">
+                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-primary mb-4 block">Thành tựu mới</span>
+                
+                <div className="relative mb-8 flex items-center justify-center w-24 h-24">
+                  {/* Sparkles */}
+                  {[...Array(8)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ 
+                        scale: [0, 1, 0], 
+                        opacity: [0, 1, 0],
+                        x: [0, Math.cos(i * 45 * Math.PI / 180) * 50],
+                        y: [0, Math.sin(i * 45 * Math.PI / 180) * 50]
+                      }}
+                      transition={{ 
+                        duration: 1.5, 
+                        repeat: Infinity, 
+                        delay: i * 0.2,
+                        ease: "easeOut"
+                      }}
+                      className={`absolute w-1.5 h-1.5 rounded-full ${i % 2 === 0 ? 'bg-primary' : 'bg-yellow-400'}`}
+                    />
+                  ))}
+
+                  <motion.div 
+                    animate={{ 
+                      scale: [1, 1.1, 1],
+                    }}
+                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                    className={`text-[64px] flex items-center justify-center relative z-10 transition-all ${
+                      !(!!unlockedIds[selectedAchievement.id] || getAchievementProgress(selectedAchievement).every(p => p.isDone)) 
+                        && 'grayscale opacity-50'
+                    }`}
+                    style={{
+                      filter: (!!unlockedIds[selectedAchievement.id] || getAchievementProgress(selectedAchievement).every(p => p.isDone))
+                        ? "drop-shadow(0 0 12px rgba(255,200,0,0.6))"
+                        : "none"
+                    }}
+                  >
+                    {selectedAchievement.emoji}
+                  </motion.div>
                 </div>
                 
-                <h3 className="text-xl font-black text-foreground mb-2 tracking-tight">{selectedAchievement.title}</h3>
-                <p className="text-sm text-muted-foreground mb-6 leading-relaxed">{selectedAchievement.description}</p>
+                <h3 className="text-[22px] font-[800] text-foreground mb-2 tracking-tight uppercase leading-tight">{selectedAchievement.title}</h3>
+                <p className="text-[14px] text-muted-foreground mb-6 leading-relaxed px-2 font-medium">{selectedAchievement.description}</p>
                 
                 <div className="w-full space-y-4">
                   {/* Progress Bars Section (Always Show if there are conditions or inferred progress) */}

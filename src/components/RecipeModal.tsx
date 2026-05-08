@@ -14,11 +14,12 @@ import {
   TrendingUp,
   Heart,
 } from 'lucide-react';
-import { Recipe, Review } from '../types';
+import { Recipe, Review, Category } from '../types';
 import HeartButton from './HeartButton';
 import Avatar from './Avatar';
 import { db } from '../lib/firebase';
 import { useLockBodyScroll } from '../hooks/useLockBodyScroll';
+import { useCategory } from '../context/CategoryContext';
 import { 
   collection, 
   query, 
@@ -40,6 +41,7 @@ interface RecipeModalProps {
 export default function RecipeModal({ recipe, onClose }: RecipeModalProps) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
+  const { getCategoryById } = useCategory();
 
   useEffect(() => {
     if (recipe?.id) {
@@ -135,7 +137,25 @@ export default function RecipeModal({ recipe, onClose }: RecipeModalProps) {
                       </div>
                     )}
                   </div>
-                  <h2 className="text-2xl md:text-3xl font-black text-foreground leading-tight">{recipe.title}</h2>
+                  <h2 className="text-2xl md:text-3xl font-black text-foreground leading-tight mb-3">{recipe.title}</h2>
+                  {recipe.categoryId && getCategoryById(recipe.categoryId) && (
+                    <div 
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl border shadow-sm"
+                      style={{ 
+                        backgroundColor: `${getCategoryById(recipe.categoryId)!.color}15`, 
+                        color: getCategoryById(recipe.categoryId)!.color,
+                        borderColor: `${getCategoryById(recipe.categoryId)!.color}30`
+                      }}
+                    >
+                      <span className="text-lg">{getCategoryById(recipe.categoryId)!.emoji}</span>
+                      <span className="text-xs font-black uppercase tracking-widest">{getCategoryById(recipe.categoryId)!.name}</span>
+                    </div>
+                  )}
+                  {recipe.shortDescription && (
+                    <p className="mt-3 text-[14px] text-muted-foreground italic font-bold leading-relaxed">
+                      {recipe.shortDescription}
+                    </p>
+                  )}
                 </div>
               </div>
 

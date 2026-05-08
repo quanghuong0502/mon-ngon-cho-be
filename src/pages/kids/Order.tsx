@@ -18,9 +18,10 @@ import {
   Timestamp 
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Recipe, WeeklyMenu, Order } from '../../types';
+import { Recipe, WeeklyMenu, Order, Category } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
+import { useCategory } from '../../context/CategoryContext';
 import { 
   Check,
   ChefHat,
@@ -78,12 +79,12 @@ interface FirestoreErrorInfo {
   }
 }
 
-const statusIcons: Record<string, any> = {
+const statusIcons:Record<string, any> = {
   pending: <div className="w-2 h-2 rounded-full bg-muted-foreground/50" />,
   preparing: <Loader2 size={12} className="animate-spin text-primary" />,
   ready: <CircleCheckBig size={14} className="text-green-500" />,
   done: <CircleCheckBig size={12} className="text-muted-foreground/30" />,
-  cancelled: <div className="w-2 h-2 rounded-full bg-muted-foreground/20" />
+  cancelled: <div className="w-2 h-2 rounded-full bg-destructive/50" />
 };
 
 const statusLabels: Record<string, string> = {
@@ -91,7 +92,7 @@ const statusLabels: Record<string, string> = {
   preparing: 'Đang làm',
   ready: 'Sẵn sàng!',
   done: 'Hoàn thành',
-  cancelled: 'Đã huỷ'
+  cancelled: 'Đã bị huỷ'
 };
 
 const lockMessages: Record<string, string> = {
@@ -105,7 +106,7 @@ const statusColors: Record<string, string> = {
   preparing: 'text-primary bg-primary/10',
   ready: 'text-green-600 bg-green-50',
   done: 'text-muted-foreground bg-secondary',
-  cancelled: 'text-muted-foreground bg-secondary border-border opacity-60'
+  cancelled: 'text-destructive bg-destructive/10 border-destructive/20'
 };
 
 const MealCard = memo(({ 
@@ -120,7 +121,8 @@ const MealCard = memo(({
   showCheckmark,
   isDimmed,
   onInfoClick,
-  variant = 'desktop'
+  variant = 'desktop',
+  category
 }: {
   recipe: Recipe;
   isVisualLocked: boolean;
@@ -134,6 +136,7 @@ const MealCard = memo(({
   isDimmed: boolean;
   onInfoClick: (recipe: Recipe) => void;
   variant?: 'desktop' | 'mobile';
+  category?: Category | null;
 }) => {
   const isActive = isEditing ? isMealSelected : isMealConfirmed;
 
@@ -175,9 +178,25 @@ const MealCard = memo(({
                 MÓN ĐÃ CHỌN
               </div>
             )}
+            {category && (
+              <div 
+                className="absolute bottom-2 left-2 z-20 px-2 py-1 rounded-lg border shadow-sm backdrop-blur-md"
+                style={{ backgroundColor: `${category.color}F0`, borderColor: 'transparent' }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs">{category.emoji}</span>
+                  <span className="text-[10px] font-black text-white uppercase tracking-wider">{category.name}</span>
+                </div>
+              </div>
+            )}
           </div>
           <div className="p-4">
             <h4 className="font-semibold text-foreground text-[15px] mb-1">{recipe.title}</h4>
+            {recipe.shortDescription && (
+              <p className="text-[11px] text-muted-foreground line-clamp-1 mb-1 font-medium italic">
+                {recipe.shortDescription}
+              </p>
+            )}
             <div className="flex items-center gap-1 text-primary">
               {[1, 2, 3, 4, 5].map(star => (
                 <Star key={star} size={10} className={star <= (recipe.avgRating || 5) ? 'fill-primary' : 'fill-muted-foreground/20 text-muted-foreground/20'} />
@@ -239,6 +258,18 @@ const MealCard = memo(({
           </div>
         )}
 
+        {category && (
+          <div 
+            className="absolute bottom-2 left-2 z-20 px-1.5 py-0.5 rounded-md border shadow-sm"
+            style={{ backgroundColor: `${category.color}F0`, borderColor: 'transparent' }}
+          >
+            <div className="flex items-center gap-1">
+              <span className="text-[10px]">{category.emoji}</span>
+              <span className="text-[8px] font-black text-white uppercase tracking-wider">{category.name}</span>
+            </div>
+          </div>
+        )}
+
         <button 
           onClick={(e) => {
             e.stopPropagation();
@@ -252,6 +283,11 @@ const MealCard = memo(({
 
       <div className="p-3 pb-2.5">
         <h4 className="font-medium text-foreground text-[14px] line-clamp-1 mb-1 leading-tight">{recipe.title}</h4>
+        {recipe.shortDescription && (
+          <p className="text-[10px] text-muted-foreground line-clamp-1 mb-1 font-medium italic">
+            {recipe.shortDescription}
+          </p>
+        )}
         <div className="flex items-center gap-1.5 text-primary">
           {[1, 2, 3, 4, 5].map(star => (
             <Star key={star} size={8} className={star <= (recipe.avgRating || 5) ? 'fill-primary' : 'fill-muted-foreground/20 text-muted-foreground/20'} />
@@ -298,6 +334,7 @@ export default function KidsOrder() {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>('');
   const hasInitializedTab = React.useRef(false);
+  const { categories, getCategoryById } = useCategory();
   const [cancelModal, setCancelModal] = useState<{ 
     isOpen: boolean; 
     day: string | null;
@@ -601,6 +638,7 @@ export default function KidsOrder() {
       const order = orders[day];
       const now = Timestamp.now();
 
+      const dayLabel = ALL_DAYS.find(d => d.key === day)?.label;
       if (order && order.status === 'pending') {
         const newItemAddedAt = { ...(order.itemAddedAt || {}) };
         recipeIds.forEach(id => {
@@ -616,6 +654,15 @@ export default function KidsOrder() {
           }
         });
 
+        // Get names for notification
+        const oldRecipeIds = order.recipeIds || (order.recipeId ? [order.recipeId] : []);
+        const [oldRecipeDocs, newRecipeDocs] = await Promise.all([
+          Promise.all(oldRecipeIds.map(id => getDoc(doc(db, 'recipes', id)))),
+          Promise.all(recipeIds.map(id => getDoc(doc(db, 'recipes', id))))
+        ]);
+        const oldNames = oldRecipeDocs.map(d => d.data()?.title).filter(Boolean).join(', ') || 'món cũ';
+        const newNames = newRecipeDocs.map(d => d.data()?.title).filter(Boolean).join(', ') || 'món mới';
+
         await updateDoc(doc(db, 'orders', order.id!), {
           recipeIds,
           recipeId: recipeIds[0], // Keep for backward compatibility
@@ -623,7 +670,21 @@ export default function KidsOrder() {
           updatedAt: now,
           itemAddedAt: newItemAddedAt
         });
-        toast.success(`Đã cập nhật món cho ${ALL_DAYS.find(d => d.key === day)?.label}!`, { id: loadingToast });
+
+        // Notify chef about order change
+        const { getChefOneSignalIds, sendPushToUser } = await import('../../lib/oneSignal');
+        const chefIds = await getChefOneSignalIds();
+        if (chefIds.length > 0) {
+          const kidName = user.username || user.displayName || 'bé';
+          await sendPushToUser(
+            chefIds,
+            `Bé ${kidName} vừa đổi món! 🔄`,
+            `Bé ${kidName} đổi "${oldNames}" → "${newNames}" (${dayLabel})`,
+            '/chef/orders'
+          );
+        }
+
+        toast.success(`Đã cập nhật món cho ${dayLabel}!`, { id: loadingToast });
       } else {
         const initialItemAddedAt: Record<string, any> = {};
         recipeIds.forEach(id => {
@@ -642,6 +703,23 @@ export default function KidsOrder() {
           itemAddedAt: initialItemAddedAt
         };
         await addDoc(collection(db, 'orders'), orderData);
+
+        // Notify chef about new order
+        const { getChefOneSignalIds, sendPushToUser } = await import('../../lib/oneSignal');
+        const chefIds = await getChefOneSignalIds();
+        if (chefIds.length > 0) {
+          const kidName = user.username || user.displayName || 'bé';
+          const recipeDocs = await Promise.all(recipeIds.map(id => getDoc(doc(db, 'recipes', id))));
+          const newNames = recipeDocs.map(d => d.data()?.title).filter(Boolean).join(', ') || 'món ăn';
+          
+          await sendPushToUser(
+            chefIds,
+            `Bé ${kidName} vừa đặt món! 🍱`,
+            `Bé ${kidName} chọn "${newNames}" cho ${dayLabel} 🍽️`,
+            '/chef/orders'
+          );
+        }
+
         toast.success('Đặt món thành công!', { id: loadingToast });
       }
       setTempSelections(prev => {
@@ -684,11 +762,29 @@ export default function KidsOrder() {
 
     const loadingToast = toast.loading('Đang huỷ...');
     try {
+      const orderRecipeIds = order.recipeIds || (order.recipeId ? [order.recipeId] : []);
+      const recipeDocs = await Promise.all(orderRecipeIds.map(id => getDoc(doc(db, 'recipes', id))));
+      const recipeNames = recipeDocs.map(d => d.data()?.title).filter(Boolean).join(', ') || 'món ăn';
+
       await updateDoc(doc(db, 'orders', order.id!), {
         status: 'cancelled',
         cancelReason: cancelModal.reason.trim(),
         updatedAt: Timestamp.now()
       });
+
+      // Notify chef about cancellation
+      const { getChefOneSignalIds, sendPushToUser } = await import('../../lib/oneSignal');
+      const chefIds = await getChefOneSignalIds();
+      if (chefIds.length > 0) {
+        const kidName = user.username || user.displayName || 'bé';
+        await sendPushToUser(
+          chefIds,
+          `Bé ${kidName} vừa huỷ đơn! 😮`,
+          `Bé ${kidName} huỷ "${recipeNames}" cho ${dayLabel}`,
+          '/chef/orders'
+        );
+      }
+
       toast.success(`Đã huỷ đặt món ${dayLabel}`, { id: loadingToast });
       setCancelModal({ isOpen: false, day: null, reason: '' });
     } catch (err) {
@@ -772,8 +868,9 @@ export default function KidsOrder() {
                       : 'bg-secondary text-muted-foreground'
                   } ${isDateLocked ? 'opacity-45' : 'opacity-100'} ${isToday ? 'font-semibold underline decoration-primary/30' : ''}`}
                 >
-                  {order && order.status !== 'cancelled' && (
+                  {order && (
                     <div className={`absolute -top-1 -right-0.5 w-[7px] h-[7px] rounded-full border border-card z-10 ${
+                      order.status === 'cancelled' ? 'bg-destructive shadow-[0_0_8px_rgba(239,68,68,0.6)]' :
                       order.status === 'pending' ? 'bg-muted-foreground/50' :
                       order.status === 'preparing' ? 'bg-orange-400' :
                       order.status === 'ready' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' :
@@ -816,6 +913,8 @@ export default function KidsOrder() {
                 const isPending = order?.status === 'pending';
                 const isEditing = !!tempSelection && tempSelection.length > 0;
                 
+                const isDone = order?.status === 'done';
+                
                 // Visual lock only when time is passed or order is locked (non-pending)
                 const isVisualLocked = isDateLocked || (isConfirmed && !isPending);
                 // Selection is disabled if day is locked OR if order is confirmed and we aren't in editing mode
@@ -840,7 +939,7 @@ export default function KidsOrder() {
                 return (
                   <div className="space-y-4">
                     {/* Header Warning for Locked State */}
-                    {isDateLocked && (
+                    {isDateLocked && !isDone && (
                       <div className="mx-0 p-4 rounded-2xl bg-destructive/5 border border-destructive/10 flex items-start gap-3">
                         <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
                           <Lock size={18} className="text-destructive" />
@@ -852,40 +951,123 @@ export default function KidsOrder() {
                       </div>
                     )}
 
-                    <div className="flex flex-col gap-3">
-                      {[...slotRecipes]
-                        .sort((a, b) => {
-                          const aSelected = orderRecipeIds.includes(a);
-                          const bSelected = orderRecipeIds.includes(b);
-                          if (aSelected && !bSelected) return -1;
-                          if (!aSelected && bSelected) return 1;
-                          return 0;
-                        })
-                        .map(recipeId => {
-                          const recipe = recipes[recipeId];
-                          if (!recipe) return null;
-                          
-                          const isMealConfirmed = orderRecipeIds.includes(recipeId) && order?.status !== 'cancelled';
-                          const isMealSelected = tempSelection?.includes(recipeId);
+                    {isDone && (
+                      <div className="mx-0 p-4 rounded-2xl bg-destructive/5 border border-destructive/10 flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                          <CircleCheckBig size={18} className="text-destructive" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-sm font-bold text-destructive">Bé đã hoàn thành bữa ăn hôm nay</p>
+                          <p className="text-[11px] text-destructive/70 leading-relaxed font-medium">Bé nhớ đặt món cho ngày mai nhé!.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {order?.status === 'cancelled' && order.cancelledBy === 'chef' && !isEditing && (
+                      <div className="mx-0 p-4 rounded-2xl bg-destructive/[0.03] border border-destructive/20 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                            <Trash2 size={18} className="text-destructive" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-bold text-destructive italic">Đơn đã bị huỷ: "{order.cancelReason}"</p>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed font-medium">Bé ơi, đầu bếp rất tiếc phải huỷ đơn này. Bé có muốn đặt lại món khác không?</p>
+                          </div>
+                        </div>
+                        {!isDateLocked && (
+                          <button
+                            onClick={() => setTempSelections(prev => ({ ...prev, [day.key]: [] }))}
+                            className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary-shadow/30 active:scale-[0.98] transition-all"
+                          >
+                            Đặt món khác ngay
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-8">
+                      {categories.filter(c => c.isActive || slotRecipes.some(id => recipes[id]?.categoryId === c.id))
+                        .sort((a, b) => (a.order || 0) - (b.order || 0))
+                        .map(category => {
+                          const categoryMeals = slotRecipes.filter(id => recipes[id]?.categoryId === category.id);
+                          if (categoryMeals.length === 0) return null;
 
                           return (
-                            <MealCard
-                              key={recipeId}
-                              recipe={recipe}
-                              isVisualLocked={isVisualLocked}
-                              isSelectionDisabled={isSelectionDisabled}
-                              handleSelect={handleSelect}
-                              dayKey={day.key}
-                              isEditing={isEditing}
-                              isMealSelected={isMealSelected}
-                              isMealConfirmed={isMealConfirmed}
-                              showCheckmark={!isEditing && isMealConfirmed}
-                              isDimmed={isVisualLocked && !isMealConfirmed}
-                              onInfoClick={setSelectedRecipe}
-                              variant="mobile"
-                            />
+                            <div key={category.id} className="space-y-3">
+                              <div className="flex items-center gap-3 px-1">
+                                <span className="text-xl">{category.emoji}</span>
+                                <h3 className="text-sm font-black text-foreground uppercase tracking-widest">{category.name}</h3>
+                                <div className="flex-1 h-px bg-border/50" />
+                              </div>
+                              <div className="flex flex-col gap-3">
+                                {categoryMeals.map(recipeId => {
+                                  const recipe = recipes[recipeId];
+                                  if (!recipe) return null;
+                                  
+                                  const isMealConfirmed = orderRecipeIds.includes(recipeId) && order?.status !== 'cancelled';
+                                  const isMealSelected = tempSelection?.includes(recipeId);
+
+                                  return (
+                                    <MealCard
+                                      key={recipeId}
+                                      recipe={recipe}
+                                      isVisualLocked={isVisualLocked}
+                                      isSelectionDisabled={isSelectionDisabled}
+                                      handleSelect={handleSelect}
+                                      dayKey={day.key}
+                                      isEditing={isEditing}
+                                      isMealSelected={isMealSelected}
+                                      isMealConfirmed={isMealConfirmed}
+                                      showCheckmark={!isEditing && isMealConfirmed}
+                                      isDimmed={isVisualLocked && !isMealConfirmed}
+                                      onInfoClick={setSelectedRecipe}
+                                      variant="mobile"
+                                      category={category}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
                           );
                         })}
+                      
+                      {/* Uncategorized meals if any */}
+                      {slotRecipes.some(id => !recipes[id]?.categoryId) && (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3 px-1">
+                            <span className="text-xl">🍲</span>
+                            <h3 className="text-sm font-black text-foreground uppercase tracking-widest">Khác</h3>
+                            <div className="flex-1 h-px bg-border/50" />
+                          </div>
+                          <div className="flex flex-col gap-3">
+                            {slotRecipes.filter(id => !recipes[id]?.categoryId).map(recipeId => {
+                              const recipe = recipes[recipeId];
+                              if (!recipe) return null;
+                              
+                              const isMealConfirmed = orderRecipeIds.includes(recipeId) && order?.status !== 'cancelled';
+                              const isMealSelected = tempSelection?.includes(recipeId);
+
+                              return (
+                                <MealCard
+                                  key={recipeId}
+                                  recipe={recipe}
+                                  isVisualLocked={isVisualLocked}
+                                  isSelectionDisabled={isSelectionDisabled}
+                                  handleSelect={handleSelect}
+                                  dayKey={day.key}
+                                  isEditing={isEditing}
+                                  isMealSelected={isMealSelected}
+                                  isMealConfirmed={isMealConfirmed}
+                                  showCheckmark={!isEditing && isMealConfirmed}
+                                  isDimmed={isVisualLocked && !isMealConfirmed}
+                                  onInfoClick={setSelectedRecipe}
+                                  variant="mobile"
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Action Row for Mobile Pending Order */}
@@ -926,12 +1108,6 @@ export default function KidsOrder() {
                           <div className="bg-green-50 text-green-600 px-4 py-1.5 rounded-full text-[13px] font-black border border-green-100 animate-bounce flex items-center gap-2 shadow-sm">
                             <Utensils size={14} strokeWidth={3} />
                             Sẵn sàng!
-                          </div>
-                        )}
-                        {order.status === 'done' && (
-                          <div className="bg-secondary text-muted-foreground px-4 py-1.5 rounded-full text-[13px] font-medium border border-border flex items-center gap-2">
-                            <CircleCheckBig size={14} />
-                            Hoàn thành
                           </div>
                         )}
                       </div>
@@ -996,6 +1172,8 @@ export default function KidsOrder() {
               const isPending = order?.status === 'pending';
               const isEditing = !!tempSelection && tempSelection.length > 0;
               
+              const isDone = order?.status === 'done';
+              
               // Visual lock only when time is passed or order is locked (non-pending)
               const isVisualLocked = isDateLocked || (isConfirmed && !isPending);
               // Selection is disabled if day is locked OR if order is confirmed and we aren't in editing mode
@@ -1018,10 +1196,17 @@ export default function KidsOrder() {
                     </div>
                     
                     {/* Locked Message Header Desktop */}
-                    {isDateLocked && (
+                    {isDateLocked && !isDone && (
                       <div className="mb-1 p-2 rounded-xl bg-destructive/5 border border-destructive/10 flex items-center gap-2">
                         <Lock size={12} className="text-destructive" />
                         <span className="text-[10px] font-bold text-destructive uppercase tracking-wider">Hết giờ</span>
+                      </div>
+                    )}
+
+                    {isDone && (
+                      <div className="mb-1 p-2 rounded-xl bg-destructive/5 border border-destructive/10 flex items-center gap-2">
+                        <CircleCheckBig size={12} className="text-destructive" />
+                        <span className="text-[10px] font-bold text-destructive uppercase tracking-wider">Đã hoàn thành</span>
                       </div>
                     )}
 
@@ -1036,6 +1221,25 @@ export default function KidsOrder() {
                             <span className={`text-[10px] font-medium text-muted-foreground px-1 ${order.status === 'done' || order.status === 'cancelled' ? 'sr-only' : ''}`}>
                               {lockMessages[order.status]}
                             </span>
+                          )}
+                          {order.status === 'cancelled' && order.cancelledBy === 'chef' && !isEditing && (
+                            <div className="mt-1 p-3 rounded-xl bg-destructive/[0.03] border border-destructive/10 space-y-2">
+                              <div className="flex items-center gap-1.5 text-destructive">
+                                <Trash2 size={12} />
+                                <span className="text-[10px] font-black uppercase tracking-wider">Đã bị huỷ</span>
+                              </div>
+                              <p className="text-[11px] text-destructive font-bold italic leading-tight">
+                                "{order.cancelReason}"
+                              </p>
+                              {!isDateLocked && (
+                                <button
+                                  onClick={() => setTempSelections(prev => ({ ...prev, [day.key]: [] }))}
+                                  className="w-full py-2 bg-primary text-primary-foreground rounded-lg font-black text-[9px] uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all shadow-sm"
+                                >
+                                  Đặt lại món
+                                </button>
+                              )}
+                            </div>
                           )}
                           {isTomorrow && isDateLocked && !isConfirmed && (
                             <div className="flex items-center gap-1.5 px-2 py-1 bg-destructive/5 text-destructive rounded-lg border border-destructive/10">
@@ -1083,6 +1287,7 @@ export default function KidsOrder() {
                               showCheckmark={showCheckmark}
                               isDimmed={isDimmed}
                               onInfoClick={setSelectedRecipe}
+                              category={recipe.categoryId ? getCategoryById(recipe.categoryId) : null}
                             />
                           );
                         })

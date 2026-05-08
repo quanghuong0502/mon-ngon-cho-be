@@ -13,10 +13,11 @@ import {
   updateDoc,
   doc,
   getDoc,
-  Timestamp
+  Timestamp,
+  where
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { Order, OrderStatus, Recipe, Review, User } from '../../types';
+import { Order, OrderStatus, Recipe, Review, User, CancelReason } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
 import Avatar from '../../components/Avatar';
 import { 
@@ -35,12 +36,15 @@ import {
   ArrowLeft,
   Navigation,
   MapPin,
-  Trash2
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { getOptimizedUrl } from '../../lib/cloudinary';
 import { sendPushToUser } from '../../lib/oneSignal';
+import ConfirmModal from '../../components/ConfirmModal';
+import { toast } from 'react-hot-toast';
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string, color: string, icon: any, next?: OrderStatus, buttonLabel?: string }> = {
   pending: { 
@@ -95,8 +99,25 @@ export default function OrderManager() {
   const [searchTerm, setSearchTerm] = useState('');
   const [reviews, setReviews] = useState<Record<string, Review>>({});
   const [kidProfiles, setKidProfiles] = useState<Record<string, User>>({});
+  
+  // Cancel Order Modal State
+  const [cancellingOrder, setCancellingOrder] = useState<Order | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [dynamicReasons, setDynamicReasons] = useState<CancelReason[]>([]);
 
   useEffect(() => {
+    // Fetch active cancel reasons
+    const qr = query(
+      collection(db, 'cancelReasons'),
+      where('isActive', '==', true),
+      orderBy('order', 'asc')
+    );
+    const unsubReasons = onSnapshot(qr, (snap) => {
+      setDynamicReasons(snap.docs.map(d => ({ id: d.id, ...d.data() } as CancelReason)));
+    });
+
     const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       const loadedOrders = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Order));
@@ -151,6 +172,7 @@ export default function OrderManager() {
     return () => {
       unsubscribe();
       unsubscribeReviews();
+      unsubReasons();
     };
   }, []);
 
@@ -173,13 +195,15 @@ export default function OrderManager() {
           const orderRecipeIds = order.recipeIds || (order.recipeId ? [order.recipeId] : []);
           let recipeNames = 'món ăn';
           
-          if (orderRecipeIds.length > 1) {
+          if (orderRecipeIds.length >= 3) {
             recipeNames = `${orderRecipeIds.length} món ăn`;
-          } else if (orderRecipeIds.length === 1) {
-            recipeNames = recipes[orderRecipeIds[0]]?.title || 'món ăn';
+          } else if (orderRecipeIds.length > 0) {
+            const names = orderRecipeIds.map(rid => recipes[rid]?.title).filter(Boolean);
+            recipeNames = names.join(' và ');
+            if (!recipeNames) recipeNames = 'món ăn';
           }
           
-          const displayRecipeName = recipeNames.length > 30 ? recipeNames.substring(0, 27) + '...' : recipeNames;
+          const displayRecipeName = recipeNames.length > 50 ? recipeNames.substring(0, 47) + '...' : recipeNames;
 
           const messages: Record<string, { title: string; body: string }> = {
             preparing: {
@@ -209,6 +233,66 @@ export default function OrderManager() {
       }
     } catch (err) {
       console.error('Error in updateStatus:', err);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!cancellingOrder || !cancelReason || (cancelReason === 'Lý do khác' && !customReason)) return;
+
+    setIsCancelling(true);
+    
+    // Combine chip reason + additional note as requested by user
+    const finalReason = customReason.trim()
+      ? `${cancelReason} — ${customReason.trim()}`
+      : cancelReason;
+    
+    try {
+      // Ensure we are using the correct document reference and status
+      const orderRef = doc(db, 'orders', cancellingOrder.id!);
+      await updateDoc(orderRef, {
+        status: 'cancelled',
+        cancelledBy: 'chef',
+        cancelReason: finalReason,
+        cancelledAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      });
+
+      // Send push notification to kid
+      const kid = kidProfiles[cancellingOrder.kidId];
+      const oneSignalIds = kid?.oneSignalIds || (kid?.oneSignalId ? [kid.oneSignalId] : []);
+      
+      if (oneSignalIds.length > 0) {
+        const orderRecipeIds = cancellingOrder.recipeIds || (cancellingOrder.recipeId ? [cancellingOrder.recipeId] : []);
+        let recipeNames = 'món ăn';
+        
+        if (orderRecipeIds.length > 0) {
+          const names = orderRecipeIds.map(rid => recipes[rid]?.title).filter(Boolean);
+          recipeNames = names.join(', ');
+          if (!recipeNames) recipeNames = 'món ăn';
+        }
+        
+        const displayRecipeName = recipeNames.length > 30 ? recipeNames.substring(0, 27) + '...' : recipeNames;
+
+        const dayLabel = { mon: 'Thứ Hai', tue: 'Thứ Ba', wed: 'Thứ Tư', thu: 'Thứ Năm', fri: 'Thứ Sáu', sat: 'Thứ Bảy', sun: 'Chủ Nhật' }[cancellingOrder.day];
+        const kidName = kid?.name || 'bé';
+
+        await sendPushToUser(
+          oneSignalIds,
+          'Đơn của bé bị huỷ 😔',
+          `Đầu bếp huỷ "${displayRecipeName}" của bé ${kidName} (${dayLabel}). Lý do: ${finalReason}`,
+          '/kids/my-orders'
+        );
+      }
+
+      toast.success(`Đã huỷ đơn của Bé ${kid?.name || 'bé'}`);
+      setCancellingOrder(null);
+      setCancelReason('');
+      setCustomReason('');
+    } catch (err) {
+      console.error('Error cancelling order:', err);
+      toast.error('Lỗi khi huỷ đơn hàng');
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -286,6 +370,7 @@ export default function OrderManager() {
                     order={order} 
                     recipes={recipes} 
                     onUpdate={updateStatus} 
+                    onCancelClick={(order) => setCancellingOrder(order)}
                     review={reviews[order.id!]}
                     kid={kidProfiles[order.kidId]}
                   />
@@ -295,6 +380,64 @@ export default function OrderManager() {
           </section>
         ))}
       </div>
+
+      <ConfirmModal
+        isOpen={!!cancellingOrder}
+        onClose={() => {
+          if (!isCancelling) {
+            setCancellingOrder(null);
+            setCancelReason('');
+            setCustomReason('');
+          }
+        }}
+        onConfirm={handleCancelOrder}
+        title={`Huỷ đơn của Bé ${cancellingOrder ? (kidProfiles[cancellingOrder.kidId]?.name || cancellingOrder.kidId) : ''}?`}
+        message="Bé sẽ được thông báo ngay khi đơn bị huỷ"
+        confirmText="Xác nhận huỷ đơn"
+        cancelText="Giữ lại"
+        confirmDisabled={!cancelReason || (cancelReason === 'Lý do khác' && !customReason) || isCancelling}
+        icon={<AlertTriangle size={24} className="text-orange-500" />}
+      >
+        <div className="space-y-4">
+          <div className="h-px bg-border my-2" />
+          <div className="space-y-2">
+            <label className="text-xs font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1">
+              Lý do huỷ <span className="text-destructive">*</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {dynamicReasons.map(reason => (
+                <button
+                  key={reason.id}
+                  onClick={() => setCancelReason(reason.label)}
+                  className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-all border ${
+                    cancelReason === reason.label
+                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                      : 'bg-secondary text-muted-foreground border-border hover:border-primary/50'
+                  }`}
+                >
+                  {reason.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {cancelReason === 'Lý do khác' ? (
+            <textarea
+              value={customReason}
+              onChange={e => setCustomReason(e.target.value)}
+              placeholder="Nhập lý do cụ thể (bắt buộc)..."
+              className="w-full p-4 bg-secondary border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all min-h-[100px] font-medium"
+            />
+          ) : cancelReason && (
+            <textarea
+              value={customReason}
+              onChange={e => setCustomReason(e.target.value)}
+              placeholder="Thêm ghi chú (không bắt buộc)..."
+              className="w-full p-4 bg-secondary border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all min-h-[80px] font-medium"
+            />
+          )}
+        </div>
+      </ConfirmModal>
     </div>
   );
 }
@@ -306,9 +449,10 @@ interface OrderCardProps {
   review?: Review;
   kid?: User;
   onUpdate: (id: string, s: OrderStatus) => Promise<void>;
+  onCancelClick: (order: Order) => void;
 }
 
-function OrderCard({ order, recipes, review, kid, onUpdate }: OrderCardProps) {
+function OrderCard({ order, recipes, review, kid, onUpdate, onCancelClick }: OrderCardProps) {
   const config = STATUS_CONFIG[order.status];
   const Icon = config.icon;
   const dayLabel = { mon: 'T2', tue: 'T3', wed: 'T4', thu: 'T5', fri: 'T6', sat: 'T7', sun: 'CN' }[order.day];
@@ -337,13 +481,13 @@ function OrderCard({ order, recipes, review, kid, onUpdate }: OrderCardProps) {
               <h3 className="text-base md:text-lg font-black text-foreground tracking-tight truncate">{kidName}</h3>
             </div>
           </div>
-        <div className={`px-2.5 md:px-4 py-1 md:py-1.5 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 md:gap-2 border shrink-0 ${config.color}`}>
+        <div className={`px-2.5 md:px-4 py-1 md:py-1.5 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 md:gap-2 border shrink-0 ${config.color} ${order.status === 'cancelled' ? 'opacity-50' : ''}`}>
           <Icon size={10} strokeWidth={3} className="md:w-3 md:h-3" />
           {config.label}
         </div>
       </div>
 
-      <div className="p-4 md:p-6 bg-secondary/30 flex flex-col gap-3 md:gap-4">
+      <div className={`p-4 md:p-6 bg-secondary/30 flex flex-col gap-3 md:gap-4 ${order.status === 'cancelled' ? 'opacity-70 grayscale-[0.3]' : ''}`}>
         {(() => {
           const orderRecipeIds = order.recipeIds || (order.recipeId ? [order.recipeId] : []);
           return orderRecipeIds.map((rid, idx) => {
@@ -359,7 +503,15 @@ function OrderCard({ order, recipes, review, kid, onUpdate }: OrderCardProps) {
                 </div>
                 <div className="flex flex-col justify-center min-w-0">
                   <h4 className="font-bold text-foreground text-xs md:text-sm line-clamp-1 mb-0.5 md:mb-1 leading-tight">{r?.title || 'Đang tải...'}</h4>
-                  <p className="text-[9px] md:text-[10px] text-muted-foreground font-medium tracking-tight">Món ăn cho bé</p>
+                  {(() => {
+                    const subtitle = r?.shortDescription || r?.description?.slice(0, 60) || '';
+                    if (!subtitle) return null;
+                    return (
+                      <p className="text-[9px] md:text-[10px] text-muted-foreground font-medium tracking-tight line-clamp-1">
+                        {subtitle}
+                      </p>
+                    );
+                  })()}
                 </div>
               </div>
             );
@@ -368,6 +520,9 @@ function OrderCard({ order, recipes, review, kid, onUpdate }: OrderCardProps) {
         
         <p className="text-[9px] md:text-[10px] text-muted-foreground font-medium tracking-tight px-1">
           Cập nhật: {order.updatedAt ? format(order.updatedAt.toDate(), 'HH:mm', { locale: vi }) : '---'}
+          {order.status === 'cancelled' && order.cancelledBy === 'chef' && (
+            <span className="ml-2">· Huỷ bởi: Đầu bếp</span>
+          )}
         </p>
 
         {order.status === 'cancelled' && order.cancelReason && (
@@ -434,16 +589,22 @@ function OrderCard({ order, recipes, review, kid, onUpdate }: OrderCardProps) {
           </div>
         )}
         {config.next ? (
-          <button 
-            onClick={() => onUpdate(order.id!, config.next!)}
-            className={`w-full flex items-center justify-center gap-2 font-black py-3 md:py-4 rounded-[16px] md:rounded-[20px] transition-all shadow-lg active:scale-[0.97] text-[13px] md:text-sm uppercase tracking-widest ${
-              order.status === 'arrived' 
-                ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-primary-shadow/30' 
-                : 'bg-primary text-primary-foreground hover:opacity-90 shadow-primary-shadow/30'
-            }`}
-          >
-            {config.buttonLabel || `Chuyển sang: ${STATUS_CONFIG[config.next].label}`}
-          </button>
+          <div className="flex gap-2">
+            {['pending', 'preparing', 'ready'].includes(order.status) && (
+              <button
+                onClick={() => onCancelClick(order)}
+                className="flex-[0.4] py-3 md:py-4 border border-destructive/30 text-destructive font-black rounded-[16px] md:rounded-[20px] hover:bg-destructive/5 transition-all active:scale-[0.98] text-[10px] md:text-xs uppercase tracking-wider"
+              >
+                Huỷ đơn
+              </button>
+            )}
+            <button 
+              onClick={() => onUpdate(order.id!, config.next!)}
+              className={`flex-1 flex items-center justify-center gap-2 font-black py-3 md:py-4 rounded-[16px] md:rounded-[20px] transition-all shadow-lg active:scale-[0.97] text-[13px] md:text-sm uppercase tracking-widest bg-primary text-primary-foreground hover:opacity-90 shadow-primary-shadow/30`}
+            >
+              {config.buttonLabel || `Chuyển sang: ${STATUS_CONFIG[config.next].label}`}
+            </button>
+          </div>
         ) : (
           !['ready', 'on_the_way'].includes(order.status) && (
             <div className={`w-full py-3 md:py-4 flex items-center justify-center gap-2 font-bold text-[13px] md:text-sm rounded-[16px] md:rounded-[20px] ${order.status === 'cancelled' ? 'bg-destructive/10 text-destructive' : 'bg-secondary text-muted-foreground'}`}>
